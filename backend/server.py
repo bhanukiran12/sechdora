@@ -1,4 +1,4 @@
-from fastapi import FastAPI, APIRouter, HTTPException, Header, File, UploadFile, Response, Query, Depends, Request
+from fastapi import FastAPI, APIRouter, HTTPException, Header, File, UploadFile, Response, Query, Depends, Request, Body
 from fastapi.responses import JSONResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
@@ -2545,15 +2545,19 @@ async def seed_admin():
         if update:
             await db.users.update_one({"email": admin_email}, {"$set": update})
 
-async def create_indexes():
-    await db.users.create_index("email", unique=True)
-    await db.login_attempts.create_index("identifier")
-    await db.posts.create_index("user_id")
-    await db.posts.create_index("status")
-    await db.analytics.create_index("user_id")
-    await db.notifications.create_index("user_id")
-    await db.oauth_states.create_index("expires_at", expireAfterSeconds=0)
-    logger.info("Database indexes created")
+ async def create_indexes():
+     await db.users.create_index("email", unique=True)
+     await db.login_attempts.create_index("identifier")
+     await db.posts.create_index("user_id")
+     await db.posts.create_index("status")
+     await db.job_posts.create_index("user_id")
+     await db.job_posts.create_index("job_id")
+     await db.job_lead_outreach.create_index("user_id")
+     await db.job_lead_outreach.create_index("createdAt")
+     await db.analytics.create_index("user_id")
+     await db.notifications.create_index("user_id")
+     await db.oauth_states.create_index("expires_at", expireAfterSeconds=0)
+     logger.info("Database indexes created")
 
 def generate_pkce_pair():
     """Generate PKCE code_verifier and code_challenge."""
@@ -2742,9 +2746,102 @@ async def export_job_post(job_id: str, user: dict = Depends(get_current_user)):
 async def delete_job_post(job_id: str, user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobPosting")
     result = await db.job_posts.delete_one({"job_id": job_id, "user_id": user["_id"]})
-    if result.deleted_count == 0:
+     if result.deleted_count == 0:
+         raise HTTPException(status_code=404, detail="Job post not found")
+     return {"message": "Job post deleted"}
+
+
+# ─── Job Lead Outreach ────────────────────────────────────────────────────────
+
+@api_router.get("/job-posts/{job_id}/leads")
+async def get_job_leads(job_id: str, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobExport")  # Business-only
+    post = await db.job_posts.find_one({"job_id": job_id, "user_id": user["_id"]})
+    if not post:
         raise HTTPException(status_code=404, detail="Job post not found")
-    return {"message": "Job post deleted"}
+    # Mock leads based on skills/title
+    skills = post.get("requirements", [])
+    title = post.get("title", "")
+    # Generate 8 mock candidates
+    mock_names = ["Alex Rivera", "Priya Sharma", "Jordan Lee", "Ananya Patel", "Sam Carter", "Mei Lin", "Rohan Kumar", "Fatima Al-Fahim"]
+    mock_titles = ["Senior Engineer", "Lead Developer", "Staff Engineer", "Principal Engineer", "Tech Lead", "Architect", "Manager", "Director"]
+    mock_locations = ["Bangalore", "Mumbai", "Remote", "Hybrid", "Delhi NCR", "Remote"]
+    mock_skills = [["React", "TypeScript", "Node.js"], ["Python", "Django", "PostgreSQL"], ["Java", "Spring", "AWS"], ["Go", "K8s", "Microservices"], ["Frontend", "React", "UI/UX"], ["Full-stack", "MERN", "GraphQL"], ["DevOps", "Kubernetes", "CI/CD"], ["Backend", "API", "Scalability"]]
+    leads = []
+    for i in range(8):
+        primary_skills = mock_skills[i % len(mock_skills)]
+        leads.append({
+            "id": f"lead_{uuid.uuid4().hex[:8]}",
+            "name": mock_names[i],
+            "title": mock_titles[i % len(mock_titles)],
+            "location": mock_locations[i % len(mock_locations)],
+            "skills": primary_skills + (skills[:2] if skills else []),
+            "match_score": 85 + (i * 2),
+            "email": f"candidate{i+1}@example.com",
+        })
+    return {"job": {"title": title, "company": post.get("company", "")}, "leads": leads}
+
+
+@api_router.post("/job-posts/{job_id}/send-outreach")
+async def send_job_outreach(job_id: str, data: dict = Body(...), user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobExport")  # Business-only
+    post = await db.job_posts.find_one({"job_id": job_id, "user_id": user["_id"]})
+    if not post:
+        raise HTTPException(status_code=404, detail="Job post not found")
+    lead_ids = data.get("lead_ids", [])
+    if not lead_ids:
+        raise HTTPException(status_code=400, detail="No leads selected")
+    # Daily cap: 50 messages per user per day
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
+    sent_today = await db.job_lead_outreach.count_documents({
+        "user_id": user["_id"],
+        "createdAt": {"$gte": today_start.isoformat()}
+    })
+    daily_cap = 50
+    if sent_today >= daily_cap:
+        raise HTTPException(status_code=429, detail=f"Daily outreach limit reached ({daily_cap}/day). Try again tomorrow.")
+    # Token cost: 10 tokens per batch (regardless of count of leads in batch)
+    outreach_cost = TOKEN_COSTS["lead_outreach"]
+    ok, msg = await deduct_tokens(user, outreach_cost)
+    if not ok:
+        raise HTTPException(status_code=402, detail=msg)
+    await log_token_usage(user, "outreach", "lead_outreach", outreach_cost)
+    # Record outreach
+    await db.job_lead_outreach.insert_one({
+        "user_id": user["_id"],
+        "job_id": job_id,
+        "job_title": post.get("title"),
+        "company": post.get("company"),
+        "leads_sent": lead_ids,
+        "leads_count": len(lead_ids),
+        "tokens_used": outreach_cost,
+        "createdAt": datetime.now(timezone.utc).isoformat(),
+    })
+    # Simulated send (in production, integrate email/LinkedIn/etc.)
+    return {
+        "success": True,
+        "sent_count": len(lead_ids),
+        "tokens_used": outreach_cost,
+        "remaining_daily": daily_cap - sent_today - 1,
+        "message": f"Job post sent to {len(lead_ids)} candidate(s)!"
+    }
+
+
+@app.get("/job-posts/outreach/stats")
+async def get_outreach_stats(user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobExport")
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    sent_today = await db.job_lead_outreach.count_documents({
+        "user_id": user["_id"],
+        "createdAt": {"$gte": today_start}
+    })
+    total_sent = await db.job_lead_outreach.count_documents({"user_id": user["_id"]})
+    return {
+        "sent_today": sent_today,
+        "daily_cap": 50,
+        "total_sent": total_sent,
+        "remaining_today": max(0, 50 - sent_today)
+    }
 
 
 @app.get("/health")
