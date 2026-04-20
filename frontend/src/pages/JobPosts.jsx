@@ -1,4 +1,4 @@
-import { useState, useEffect } from "react";
+import { useState, useEffect, useCallback } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { Briefcase, Plus, Trash2, Copy, Download, Lock, Sparkles } from "lucide-react";
@@ -23,11 +23,7 @@ export default function JobPosts() {
 
   const headers = { Authorization: `Bearer ${token}` };
 
-  useEffect(() => {
-    fetchAll();
-  }, []);
-
-  const fetchAll = async () => {
+  const fetchAll = useCallback(async () => {
     setLoading(true);
     try {
       const planRes = await axios.get(`${API}/user/plan`, { headers });
@@ -45,7 +41,11 @@ export default function JobPosts() {
     } finally {
       setLoading(false);
     }
-  };
+  }, []);
+
+  useEffect(() => {
+    fetchAll();
+  }, [fetchAll]);
 
   const handleCreate = async (e) => {
     e.preventDefault();
