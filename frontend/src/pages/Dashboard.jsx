@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Calendar, PlusCircle, Bell, Loader2, Users, Target, Zap, PencilLine, Trash2, LoaderCircle, Sparkles } from "lucide-react";
+import { Calendar, PlusCircle, Bell, Loader2, Users, Target, Zap, PencilLine, Trash2, LoaderCircle, Sparkles, Shield } from "lucide-react";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -7,8 +7,7 @@ import Sidebar from "@/components/Sidebar";
 import FeedbackModal from "@/components/FeedbackModal";
 import SchedoraLogo from "@/components/SchedoraLogo";
 import { motion, AnimatePresence } from "framer-motion";
-
-const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
+import usePlan from "@/hooks/usePlan";
 
 import { 
   Tooltip, 
@@ -17,6 +16,8 @@ import {
   TooltipTrigger 
 } from "@/components/ui/tooltip";
 import { PLATFORMS } from "@/constants/platforms";
+
+const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
 
 function NotificationBell() {
   const [count, setCount] = useState(0);
@@ -122,6 +123,7 @@ function NotificationBell() {
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
+  const { planType, isAdmin, postsUsed, maxPosts, canAI } = usePlan();
   const [posts, setPosts] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -283,7 +285,43 @@ export default function Dashboard() {
         >
           <div>
             <SchedoraLogo size="md" className="-ml-1 mb-3" />
-            <p className="text-lg text-text-secondary font-medium italic opacity-70 italic">"Action is the foundational key to all success."</p>
+            <p className="text-lg text-text-secondary font-medium italic opacity-70">"Action is the foundational key to all success."</p>
+            <div className="mt-3 flex items-center gap-3 flex-wrap">
+              <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border-2 border-black text-xs font-black uppercase tracking-widest ${
+                isAdmin ? 'bg-primary text-white' :
+                planType === 'business' ? 'bg-primary text-white' :
+                planType === 'pro' ? 'bg-blue-100 text-blue-800' :
+                'bg-white text-text-primary'
+              }`}>
+                {isAdmin && <Shield className="w-3 h-3" strokeWidth={3} />}
+                {isAdmin ? 'Admin' : planType}
+              </span>
+              {!isAdmin && (
+                <div className="flex items-center gap-2">
+                  <div className="text-xs font-bold text-text-muted">
+                    {postsUsed}/{maxPosts === null ? '∞' : maxPosts} posts
+                  </div>
+                  {maxPosts !== null && (
+                    <div className="w-24 h-2 bg-gray-200 rounded-full border border-black overflow-hidden">
+                      <div
+                        className={`h-full rounded-full transition-all ${postsUsed / maxPosts > 0.8 ? 'bg-red-500' : 'bg-primary'}`}
+                        style={{ width: `${Math.min(100, (postsUsed / maxPosts) * 100)}%` }}
+                      />
+                    </div>
+                  )}
+                  {maxPosts !== null && postsUsed >= maxPosts && (
+                    <button onClick={() => navigate('/pricing')} className="text-xs font-black text-primary hover:underline">
+                      Upgrade
+                    </button>
+                  )}
+                </div>
+              )}
+              {!isAdmin && !canAI && (
+                <button onClick={() => navigate('/pricing')} className="text-xs font-bold text-text-muted hover:text-primary flex items-center gap-1">
+                  <Zap className="w-3 h-3" />Unlock AI
+                </button>
+              )}
+            </div>
           </div>
           
           <div className="w-full lg:w-auto flex flex-wrap items-center gap-4">

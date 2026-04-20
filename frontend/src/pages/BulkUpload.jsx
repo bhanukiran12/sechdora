@@ -4,15 +4,19 @@ import axios from "axios";
 import { toast } from "sonner";
 import { 
   Upload, CheckCircle, XCircle, Download, 
-  Plus, Send, LayoutGrid, FileSpreadsheet, Loader2, AlertTriangle, Zap
+  Plus, Send, LayoutGrid, FileSpreadsheet, Loader2, AlertTriangle, Zap, Lock
 } from "lucide-react";
 import BulkPostCard from "@/components/BulkPostCard";
 import { motion, AnimatePresence } from "framer-motion";
+import { useNavigate } from "react-router-dom";
+import usePlan from "@/hooks/usePlan";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
 const API = `${BACKEND_URL}/api`;
 
 export default function BulkUpload() {
+  const navigate = useNavigate();
+  const { canBulkUpload, loading: planLoading } = usePlan();
   const [activeMode, setActiveMode] = useState('manual');
   const [loading, setLoading] = useState(false);
   const [manualPosts, setManualPosts] = useState([
@@ -131,6 +135,34 @@ export default function BulkUpload() {
     const a = document.createElement('a');
     a.href = url; a.download = 'schedora-bulk-template.csv'; a.click();
   };
+
+  if (!planLoading && !canBulkUpload) {
+    return (
+      <div className="flex bg-background min-h-screen">
+        <Sidebar active="bulk" />
+        <main className="flex-1 p-6 md:p-12 flex items-center justify-center">
+          <div className="brutal-card p-12 max-w-md text-center">
+            <div className="w-16 h-16 bg-pastel-yellow border-4 border-black rounded-2xl shadow-brutal flex items-center justify-center mx-auto mb-6">
+              <Lock className="w-8 h-8" strokeWidth={3} />
+            </div>
+            <h2 className="text-3xl font-black mb-3">Pro Feature</h2>
+            <p className="text-text-secondary font-medium mb-6">
+              Bulk upload lets you schedule weeks of content in minutes.<br />Upgrade to Pro or Business to unlock it.
+            </p>
+            <button
+              onClick={() => navigate('/pricing')}
+              className="brutal-button bg-primary text-white w-full py-3 font-black flex items-center justify-center gap-2 mb-3"
+            >
+              <Zap className="w-5 h-5" strokeWidth={3} /> View Pricing Plans
+            </button>
+            <button onClick={() => navigate('/dashboard')} className="brutal-button bg-white w-full py-3 font-bold text-sm">
+              Back to Dashboard
+            </button>
+          </div>
+        </main>
+      </div>
+    );
+  }
 
   return (
     <div className="flex bg-background min-h-screen">

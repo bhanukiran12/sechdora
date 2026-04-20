@@ -70,6 +70,30 @@ function ProtectedRoute({ children }) {
   );
 }
 
+function AdminRoute({ children }) {
+  const [status, setStatus] = useState(null);
+  const location = useLocation();
+
+  useEffect(() => {
+    const check = async () => {
+      try {
+        const res = await axios.get(`${API}/user/plan`, {
+          headers: { Authorization: `Bearer ${localStorage.getItem('access_token')}` },
+          withCredentials: true
+        });
+        setStatus(res.data?.isAdmin ? 'admin' : 'denied');
+      } catch {
+        setStatus('denied');
+      }
+    };
+    check();
+  }, [location]);
+
+  if (status === null) return <div className="flex items-center justify-center min-h-screen bg-background font-heading text-xl font-black">Loading...</div>;
+  if (status === 'denied') return <Navigate to="/dashboard" replace />;
+  return <>{children}</>;
+}
+
 function FeedbackTrigger() {
   const [isFeedbackOpen, setIsFeedbackOpen] = useState(false);
   const location = useLocation();
@@ -105,7 +129,7 @@ function AppRouter() {
       <Route path="/posts/bulk-upload" element={<ProtectedRoute><BulkUpload /></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
       <Route path="/settings/accounts" element={<ProtectedRoute><ConnectedAccounts /></ProtectedRoute>} />
-      <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/jobs" element={<ProtectedRoute><JobPosts /></ProtectedRoute>} />
       <Route path="/tokens" element={<ProtectedRoute><TokenDashboard /></ProtectedRoute>} />

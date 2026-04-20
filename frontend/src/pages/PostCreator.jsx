@@ -2,11 +2,13 @@ import { useNavigate } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { toast } from "sonner";
-import { Upload, Sparkles, ArrowLeft, Image as ImageIcon, Eye, PenLine, ShieldCheck, Lightbulb, Loader2, CalendarDays, Clock3 } from "lucide-react";
+import { Upload, Sparkles, ArrowLeft, Image as ImageIcon, Eye, PenLine, ShieldCheck, Lightbulb, Loader2, CalendarDays, Clock3, Lock } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import PostPreview from "@/components/PostPreview";
 import TokenWarningModal from "@/components/TokenWarningModal";
+import UpgradeModal from "@/components/UpgradeModal";
 import { detectUrl, calculateTokenCost } from "@/utils/tokens";
+import usePlan from "@/hooks/usePlan";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
 const API = `${BACKEND_URL}/api`;
@@ -21,6 +23,7 @@ const PLATFORMS = [
 
 export default function PostCreator() {
   const navigate = useNavigate();
+  const { canAI, canCustomRecurrence } = usePlan();
   const [content, setContent] = useState('');
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [connectedAccounts, setConnectedAccounts] = useState([]);
@@ -37,6 +40,7 @@ export default function PostCreator() {
   const [showPreview, setShowPreview] = useState(false);
   const [tokenWarning, setTokenWarning] = useState({ open: false, tokensRequired: 3 });
   const [pendingPostStatus, setPendingPostStatus] = useState(null);
+  const [upgradeModal, setUpgradeModal] = useState({ open: false, message: "" });
 
   const formatLocalDateInput = (date) => {
     const year = date.getFullYear();
@@ -292,6 +296,11 @@ export default function PostCreator() {
         tokensRequired={tokenWarning.tokensRequired}
         content={content}
       />
+      <UpgradeModal
+        isOpen={upgradeModal.open}
+        onClose={() => setUpgradeModal({ open: false, message: "" })}
+        message={upgradeModal.message}
+      />
       <div className="flex" data-testid="post-creator-container">
         <Sidebar active="create" />
       <main className="flex-1 bg-background p-6 md:p-12">
@@ -394,10 +403,21 @@ export default function PostCreator() {
             <div className="brutal-card p-6">
               <div className="flex justify-between items-center mb-3">
                 <label className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted">Post Content</label>
-                <button onClick={improveCaption} disabled={generating} className="flex items-center gap-2 text-sm font-bold text-primary hover:underline disabled:opacity-70" data-testid="improve-caption-button">
-                  {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 animate-sparkle" />}
-                  {generating ? 'Improving...' : 'Improve with AI'}
-                </button>
+                {canAI ? (
+                  <button onClick={improveCaption} disabled={generating} className="flex items-center gap-2 text-sm font-bold text-primary hover:underline disabled:opacity-70" data-testid="improve-caption-button">
+                    {generating ? <Loader2 className="w-4 h-4 animate-spin" /> : <Sparkles className="w-4 h-4 animate-sparkle" />}
+                    {generating ? 'Improving...' : 'Improve with AI'}
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setUpgradeModal({ open: true, message: "Upgrade to Pro or Business to use AI content generation." })}
+                    className="flex items-center gap-2 text-sm font-bold text-text-muted hover:text-primary transition-colors"
+                    data-testid="improve-caption-button"
+                  >
+                    <Lock className="w-4 h-4" />
+                    AI (Pro)
+                  </button>
+                )}
               </div>
               <textarea value={content} onChange={(e) => setContent(e.target.value)} placeholder="Write your post content here..." className="w-full h-40 brutal-input resize-none" data-testid="post-content-input" />
               {generating && (
@@ -495,11 +515,24 @@ export default function PostCreator() {
 
               <label className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-3 block">Repeat Post</label>
               <div className="flex gap-2 flex-wrap mb-3">
-                {['none', 'daily', 'weekly', 'monthly', 'custom'].map(r => (
+                {['none', 'daily', 'weekly', 'monthly'].map(r => (
                   <button key={r} onClick={() => setRecurrence(r)} className={`px-4 py-2 rounded-full border-2 border-border font-medium text-sm shadow-brutalSoft ${recurrence === r ? 'bg-primary text-white border-primary' : 'bg-white'}`} data-testid={`recurrence-${r}`}>
-                    {r === 'none' ? 'One-time' : r === 'custom' ? 'Custom' : r.charAt(0).toUpperCase() + r.slice(1)}
+                    {r === 'none' ? 'One-time' : r.charAt(0).toUpperCase() + r.slice(1)}
                   </button>
                 ))}
+                {canCustomRecurrence ? (
+                  <button onClick={() => setRecurrence('custom')} className={`px-4 py-2 rounded-full border-2 border-border font-medium text-sm shadow-brutalSoft ${recurrence === 'custom' ? 'bg-primary text-white border-primary' : 'bg-white'}`} data-testid="recurrence-custom">
+                    Custom
+                  </button>
+                ) : (
+                  <button
+                    onClick={() => setUpgradeModal({ open: true, message: "Upgrade to Pro or Business to set custom repeat intervals." })}
+                    className="px-4 py-2 rounded-full border-2 border-dashed border-border font-medium text-sm text-text-muted flex items-center gap-1"
+                    data-testid="recurrence-custom"
+                  >
+                    <Lock className="w-3 h-3" /> Custom (Pro)
+                  </button>
+                )}
               </div>
               {recurrence === 'custom' && (
                 <div className="flex items-center gap-3 mb-4 p-3 bg-white border-2 border-primary rounded-xl">

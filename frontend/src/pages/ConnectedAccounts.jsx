@@ -4,13 +4,17 @@ import axios from "axios";
 import { toast } from "sonner";
 import { 
   Plus, Check, X, AlertCircle, ExternalLink, 
-  Loader2, ShieldCheck, Share2, Info 
+  Loader2, ShieldCheck, Share2, Info, Zap
 } from "lucide-react";
 import { PLATFORMS } from "@/constants/platforms";
+import usePlan from "@/hooks/usePlan";
+import { useNavigate } from "react-router-dom";
 
 const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
 
 export default function ConnectedAccounts() {
+  const navigate = useNavigate();
+  const { connectedCount, maxAccounts, isAdmin, planType } = usePlan();
   const [accounts, setAccounts] = useState([]);
   const [loading, setLoading] = useState(true);
   const [connecting, setConnecting] = useState(null);
@@ -93,9 +97,33 @@ export default function ConnectedAccounts() {
     <div className="flex bg-background min-h-screen">
       <Sidebar active="accounts" />
       <main className="flex-1 p-6 md:p-12 max-w-6xl mx-auto w-full">
-        <div className="mb-12">
-          <h1 className="text-5xl font-black font-heading tracking-tighter mb-2">Social Channels</h1>
-          <p className="text-text-secondary">Manage where your content gets published.</p>
+        <div className="mb-12 flex items-start justify-between gap-6 flex-wrap">
+          <div>
+            <h1 className="text-5xl font-black font-heading tracking-tighter mb-2">Social Channels</h1>
+            <p className="text-text-secondary">Manage where your content gets published.</p>
+          </div>
+          <div className="flex flex-col items-end gap-2">
+            <div className="brutal-card px-5 py-3 flex items-center gap-3 bg-white">
+              <div className="text-xs font-black uppercase tracking-widest text-text-muted">Accounts</div>
+              <div className="text-xl font-black">{connectedCount}<span className="text-text-muted font-bold">/{isAdmin ? '∞' : maxAccounts}</span></div>
+              {!isAdmin && maxAccounts > 0 && (
+                <div className="w-20 h-2 bg-gray-200 rounded-full border border-black overflow-hidden">
+                  <div
+                    className={`h-full rounded-full ${connectedCount >= maxAccounts ? 'bg-red-500' : 'bg-primary'}`}
+                    style={{ width: `${Math.min(100, (connectedCount / maxAccounts) * 100)}%` }}
+                  />
+                </div>
+              )}
+            </div>
+            {!isAdmin && connectedCount >= maxAccounts && (
+              <button
+                onClick={() => navigate('/pricing')}
+                className="brutal-button bg-primary text-white px-4 py-2 text-xs font-black flex items-center gap-1"
+              >
+                <Zap className="w-3 h-3" strokeWidth={3} /> Upgrade for more accounts
+              </button>
+            )}
+          </div>
         </div>
 
         {/* Empty State vs Connected List */}

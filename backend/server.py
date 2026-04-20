@@ -176,18 +176,32 @@ PLANS = {
     "free": {
         "name": "Free", "price": 0,
         "maxAccounts": 1, "maxPostsPerMonth": 10,
-        "aiEnabled": False, "jobPosting": False, "jobExport": False, "prioritySupport": False,
+        "aiEnabled": False, "jobPosting": False, "jobExport": False,
+        "prioritySupport": False, "bulkUpload": False,
+        "analyticsDetailed": False, "customRecurrence": False,
     },
     "pro": {
         "name": "Pro", "price": 999,
         "maxAccounts": 5, "maxPostsPerMonth": 100,
-        "aiEnabled": True, "jobPosting": True, "jobExport": False, "prioritySupport": False,
+        "aiEnabled": True, "jobPosting": True, "jobExport": False,
+        "prioritySupport": False, "bulkUpload": True,
+        "analyticsDetailed": True, "customRecurrence": True,
     },
     "business": {
         "name": "Business", "price": 2999,
-        "maxAccounts": 15, "maxPostsPerMonth": None,  # unlimited
-        "aiEnabled": True, "jobPosting": True, "jobExport": True, "prioritySupport": True,
+        "maxAccounts": 15, "maxPostsPerMonth": None,
+        "aiEnabled": True, "jobPosting": True, "jobExport": True,
+        "prioritySupport": True, "bulkUpload": True,
+        "analyticsDetailed": True, "customRecurrence": True,
     },
+}
+
+ADMIN_PLAN = {
+    "name": "Admin", "price": 0,
+    "maxAccounts": 9999, "maxPostsPerMonth": None,
+    "aiEnabled": True, "jobPosting": True, "jobExport": True,
+    "prioritySupport": True, "bulkUpload": True,
+    "analyticsDetailed": True, "customRecurrence": True,
 }
 
 # SMTP Config (Netlify/GoDaddy/ForwardEmail)
@@ -335,10 +349,16 @@ def normalize_media_urls(values: Any) -> List[str]:
 
 
 # ─── Plan Helpers ─────────────────────────────────────────────────────────────
+ADMIN_ROLES = {"admin", "owner"}
+
 def get_plan(user: dict) -> dict:
+    if user.get("role") in ADMIN_ROLES:
+        return ADMIN_PLAN
     return PLANS.get(user.get("planType", "free"), PLANS["free"])
 
 async def enforce_account_limit(user: dict):
+    if user.get("role") in ADMIN_ROLES:
+        return
     plan = get_plan(user)
     connected = await db.social_accounts.count_documents({"user_id": user["_id"], "status": "connected"})
     if connected >= plan["maxAccounts"]:
@@ -349,9 +369,11 @@ async def enforce_account_limit(user: dict):
         })
 
 async def enforce_post_limit(user: dict):
+    if user.get("role") in ADMIN_ROLES:
+        return
     plan = get_plan(user)
     if plan["maxPostsPerMonth"] is None:
-        return  # unlimited
+        return
     posts_used = user.get("postsUsedThisMonth", 0)
     if posts_used >= plan["maxPostsPerMonth"]:
         raise HTTPException(status_code=403, detail={
@@ -361,12 +383,23 @@ async def enforce_post_limit(user: dict):
         })
 
 def enforce_feature(user: dict, feature: str):
+    if user.get("role") in ADMIN_ROLES:
+        return
     plan = get_plan(user)
     if not plan.get(feature, False):
-        feature_names = {"aiEnabled": "AI content generation", "jobPosting": "Job Posts", "jobExport": "Job Post export", "prioritySupport": "Priority support"}
+        feature_names = {
+            "aiEnabled": "AI content generation",
+            "jobPosting": "Job Posts",
+            "jobExport": "Job Post export",
+            "prioritySupport": "Priority support",
+            "bulkUpload": "Bulk CSV upload",
+            "analyticsDetailed": "Detailed analytics",
+            "customRecurrence": "Custom repeat intervals",
+        }
+        plan_needed = "Pro or Business" if feature not in ("jobExport",) else "Business"
         raise HTTPException(status_code=403, detail={
             "code": "feature_locked",
-            "message": f"Upgrade your plan to access {feature_names.get(feature, feature)}.",
+            "message": f"Upgrade to {plan_needed} to access {feature_names.get(feature, feature)}.",
             "upgrade": True,
         })
 
@@ -1248,6 +1281,8 @@ async def create_post(post_data: PostCreate, user: dict = Depends(get_current_us
     if not check_rate_limit(str(user["_id"]), "create_post", 20):
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
     await enforce_post_limit(user)
+    if post_data.recurrence and post_data.recurrence.startswith("every_"):
+        enforce_feature(user, "customRecurrence")
     post_id = f"post_{uuid.uuid4().hex[:12]}"
     status = post_data.status or "draft"
     if post_data.scheduled_time:
@@ -1362,7 +1397,7 @@ async def delete_post(post_id: str, user: dict = Depends(get_current_user)):
 # ========== BULK POST CREATION ==========
 @api_router.post("/posts/bulk-create")
 async def bulk_create_posts(data: PostBulk, user: dict = Depends(get_current_user)):
-    """Process a batch of posts from manual editor or CSV preview."""
+    enforce_feature(user, "bulkUpload")
     success = 0
     failed = 0
     errors = []
@@ -1444,6 +1479,7 @@ async def bulk_create_posts(data: PostBulk, user: dict = Depends(get_current_use
     return {"success": success, "failed": failed, "errors": errors}
 
 async def bulk_upload_posts(file: UploadFile = File(...), user: dict = Depends(get_current_user)):
+    enforce_feature(user, "bulkUpload")
     if not file.filename.endswith('.csv'):
         raise HTTPException(status_code=400, detail="Only CSV files allowed")
     content = await file.read()
@@ -1478,6 +1514,7 @@ async def bulk_upload_posts(file: UploadFile = File(...), user: dict = Depends(g
 # ========== AI ==========
 @api_router.post("/ai/generate-content")
 async def generate_content(request: AIContentRequest, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "aiEnabled")
     try:
         model = genai.GenerativeModel("gemma-3-4b-it", system_instruction="You are a social media content expert.")
         prompt = f"""Generate 3 social media post ideas for: "{request.topic}"
@@ -1502,6 +1539,7 @@ Return ONLY a JSON array: [{{"title":"...","caption":"...","hashtags":["..."],"s
 
 @api_router.post("/ai/improve-caption")
 async def improve_caption(request: AIImproveRequest, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "aiEnabled")
     try:
         prompt = f"""Improve this {request.platform} caption:
 "{request.caption}"
@@ -1535,7 +1573,7 @@ Hook in first 5 words, keep it concise, optimize for {request.platform}, and inc
 
 @api_router.post("/ai/optimize-post")
 async def optimize_post(request: dict, user: dict = Depends(get_current_user)):
-    """Optimize post by removing URLs and converting to engaging CTA."""
+    enforce_feature(user, "aiEnabled")
     content = request.get("content", "")
     optimize_for = request.get("optimize_for", "no_link")
     
@@ -1675,6 +1713,7 @@ async def get_post_analytics(post_id: str, user: dict = Depends(get_current_user
 
 @api_router.get("/analytics/export")
 async def export_analytics(format: str = "csv", user: dict = Depends(get_current_user)):
+    enforce_feature(user, "analyticsDetailed")
     analytics = await db.analytics.find({"user_id": user["_id"]}, {"_id": 0}).to_list(10000)
     if format == "csv":
         output = io.StringIO()
@@ -2559,9 +2598,13 @@ async def get_pricing_plans():
 @api_router.get("/user/plan")
 async def get_user_plan(user: dict = Depends(get_current_user)):
     plan = get_plan(user)
+    is_admin = user.get("role") in ADMIN_ROLES
     connected = await db.social_accounts.count_documents({"user_id": user["_id"], "status": "connected"})
+    plan_type = "admin" if is_admin else user.get("planType", "free")
     return {
-        "planType": user.get("planType", "free"),
+        "planType": plan_type,
+        "isAdmin": is_admin,
+        "role": user.get("role", "user"),
         "plan": {**plan, "maxPostsPerMonth": plan["maxPostsPerMonth"] if plan["maxPostsPerMonth"] is not None else "unlimited"},
         "postsUsedThisMonth": user.get("postsUsedThisMonth", 0),
         "connectedAccountsCount": connected,
