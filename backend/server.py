@@ -74,6 +74,80 @@ JWT_SECRET = os.environ.get("JWT_SECRET", "schedora-fallback-secret-key-for-stab
 RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "")
 RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
 
+# ─── Token Economy (5x Profit Model) ────────────────────────────────────
+URL_REGEX = r"(https?://[^\s]+)|(www\.[^\s]+)"
+SHORT_LINK_DOMAINS = ['bit.ly', 't.co', 'goo.gl', 'tinyurl.com', 'ow.ly', 'is.gd', 'buff.ly']
+
+TOKEN_COSTS = {
+    "ai_caption": 1,
+    "standard_post": 3,
+    "url_post": 20,
+}
+
+def detect_url(content):
+    """Detect URLs in content."""
+    if not content:
+        return {"isUrlPost": False, "urls": []}
+    
+    import re
+    urls = []
+    
+    http_matches = re.findall(r"https?://[^\s]+", content, re.IGNORECASE)
+    if http_matches:
+        urls.extend(http_matches)
+    
+    www_matches = re.findall(r"www\.[^\s]+", content)
+    if www_matches:
+        urls.extend(www_matches)
+    
+    for domain in SHORT_LINK_DOMAINS:
+        short_pattern = f"{domain}/[a-zA-Z0-9]+"
+        short_matches = re.findall(short_pattern, content)
+        if short_matches:
+            urls.extend(short_matches)
+    
+    return {
+        "isUrlPost": len(urls) > 0,
+        "urls": list(set(urls))
+    }
+
+def calculate_token_cost(content):
+    """Calculate token cost for content."""
+    detection = detect_url(content)
+    cost_type = "url" if detection["isUrlPost"] else "standard"
+    tokens_required = TOKEN_COSTS["url_post"] if detection["isUrlPost"] else TOKEN_COSTS["standard_post"]
+    
+    return {
+        "tokensRequired": tokens_required,
+        "type": cost_type,
+        "urls": detection["urls"]
+    }
+
+def deduct_tokens(user, tokens):
+    """Deduct tokens from user balance. Returns (success, message)."""
+    if not user:
+        return False, "User not found"
+    
+    current_balance = user.get("tokens", 0)
+    if current_balance < tokens:
+        return False, f"Not enough credits. Need {tokens} credits, you have {current_balance}."
+    
+    await db.users.update_one(
+        {"_id": user["_id"]},
+        {"$inc": {"tokens": -tokens}}
+    )
+    return True, "Tokens deducted"
+
+def log_token_usage(user, action, token_type, tokens):
+    """Log token usage for analytics."""
+    await db.token_logs.insert_one({
+        "user_id": user["_id"],
+        "action": action,
+        "type": token_type,
+        "tokens": tokens,
+        "createdAt": datetime.now(timezone.utc)
+    })
+
 # ─── Pricing Plans ───────────────────────────────────────────────────────────
 PLANS = {
     "free": {
