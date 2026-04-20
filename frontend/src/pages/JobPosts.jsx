@@ -21,16 +21,15 @@ export default function JobPosts() {
     requirements: "", salary: "", job_type: "Full-time",
   });
 
-  const headers = { Authorization: `Bearer ${token}` };
-
   const fetchAll = useCallback(async () => {
+    const authHeaders = { Authorization: `Bearer ${token}` };
     setLoading(true);
     try {
-      const planRes = await axios.get(`${API}/user/plan`, { headers });
+      const planRes = await axios.get(`${API}/user/plan`, { headers: authHeaders });
       setPlanInfo(planRes.data);
 
       if (planRes.data.plan?.jobPosting) {
-        const jobsRes = await axios.get(`${API}/job-posts`, { headers });
+        const jobsRes = await axios.get(`${API}/job-posts`, { headers: authHeaders });
         setJobs(jobsRes.data);
       }
     } catch (err) {
@@ -41,7 +40,9 @@ export default function JobPosts() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [token]);
+
+  const headers = { Authorization: `Bearer ${token}` };
 
   useEffect(() => {
     fetchAll();
