@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `${process.env.REACT_APP_BACKEND_URL ?? ""}/api`;
 
 export default function AuthCallback() {
   const navigate = useNavigate();
@@ -16,39 +16,73 @@ export default function AuthCallback() {
 
     const processSession = async () => {
       try {
-        const hash = location.hash.substring(1);
-        const params = new URLSearchParams(hash);
-        const sessionId = params.get('session_id');
+        // Check for Google OAuth redirect (?token=...&provider=google)
+        const queryParams = new URLSearchParams(location.search);
+        const token = queryParams.get("token");
+        const provider = queryParams.get("provider");
+        const loginError = queryParams.get("error");
 
-        if (!sessionId) throw new Error('No session ID found');
+        if (loginError) {
+          const msgs = {
+            google_denied: "Google sign-in was cancelled.",
+            token_exchange: "Google authentication failed. Please try again.",
+            userinfo: "Could not retrieve your Google account info.",
+            no_email: "No email found in your Google account.",
+          };
+          toast.error(msgs[loginError] || "Authentication failed.");
+          navigate("/login", { replace: true });
+          return;
+        }
+
+        if (token && provider === "google") {
+          localStorage.setItem("access_token", token);
+          toast.success("Signed in with Google!");
+
+          // Check onboarding
+          try {
+            const statusRes = await axios.get(`${API}/onboarding/status`, {
+              headers: { Authorization: `Bearer ${token}` },
+            });
+            if (!statusRes.data.onboarding_completed) {
+              navigate("/onboarding", { replace: true });
+              return;
+            }
+          } catch (e) { /* ignore */ }
+
+          navigate("/dashboard", { replace: true });
+          return;
+        }
+
+        // Legacy flow: session_id in hash
+        const hash = location.hash.substring(1);
+        const hashParams = new URLSearchParams(hash);
+        const sessionId = hashParams.get("session_id");
+
+        if (!sessionId) throw new Error("No session ID found");
 
         const response = await axios.post(`${API}/auth/session`, {
-          session_id: sessionId
+          session_id: sessionId,
         }, { withCredentials: true });
 
         const { access_token, user } = response.data;
+        localStorage.setItem("access_token", access_token);
 
-        localStorage.setItem('access_token', access_token);
-
-        // Check onboarding status
         try {
           const statusRes = await axios.get(`${API}/onboarding/status`, {
             headers: { Authorization: `Bearer ${access_token}` },
-            withCredentials: true
+            withCredentials: true,
           });
           if (!statusRes.data.onboarding_completed) {
-            navigate('/onboarding', { replace: true, state: { user } });
+            navigate("/onboarding", { replace: true, state: { user } });
             return;
           }
-        } catch (e) {
-          // If onboarding endpoint fails, go to dashboard
-        }
+        } catch (e) { /* ignore */ }
 
-        navigate('/dashboard', { replace: true, state: { user } });
+        navigate("/dashboard", { replace: true, state: { user } });
       } catch (error) {
-        console.error('Auth callback error:', error);
-        toast.error('Authentication failed. Please try again.');
-        navigate('/login', { replace: true });
+        console.error("Auth callback error:", error);
+        toast.error("Authentication failed. Please try again.");
+        navigate("/login", { replace: true });
       }
     };
 
@@ -58,7 +92,7 @@ export default function AuthCallback() {
   return (
     <div className="flex items-center justify-center min-h-screen bg-background">
       <div className="text-center">
-        <div className="mb-4 text-4xl font-black font-heading">Authenticating...</div>
+        <div className="mb-4 text-4xl font-black font-heading animate-pulse">Signing you in...</div>
         <div className="text-text-muted">Please wait</div>
       </div>
     </div>

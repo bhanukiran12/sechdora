@@ -50,11 +50,18 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 APP_NAME = "schedora"
-PUBLIC_BACKEND_URL = (
-    os.environ.get("BACKEND_URL")
-    or os.environ.get("REACT_APP_BACKEND_URL")
-    or "https://sechdora.onrender.com"
-).rstrip("/")
+def _derive_public_backend_url():
+    # Explicit override wins
+    if os.environ.get("BACKEND_URL"):
+        return os.environ["BACKEND_URL"].rstrip("/")
+    # In Replit dev, build from REPLIT_DEV_DOMAIN or REPLIT_DOMAINS
+    replit_dev = os.environ.get("REPLIT_DEV_DOMAIN") or os.environ.get("REPLIT_DOMAINS", "").split(",")[0].strip()
+    if replit_dev:
+        return f"https://{replit_dev}"
+    # Fallback for production / old deploys
+    return (os.environ.get("REACT_APP_BACKEND_URL") or "https://sechdora.onrender.com").rstrip("/")
+
+PUBLIC_BACKEND_URL = _derive_public_backend_url()
 
 # Scheduler
 scheduler = AsyncIOScheduler()
@@ -691,6 +698,109 @@ async def logout(response: Response, user: dict = Depends(get_current_user)):
 @api_router.get("/auth/me")
 async def get_me(user: dict = Depends(get_current_user)):
     return user
+
+@api_router.get("/auth/google")
+async def google_login():
+    """Generate Google OAuth URL and redirect."""
+    google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    if not google_client_id:
+        raise HTTPException(status_code=503, detail="Google OAuth not configured")
+    redirect_uri = f"{PUBLIC_BACKEND_URL}/api/auth/google/callback"
+    state = secrets.token_urlsafe(16)
+    params = {
+        "client_id": google_client_id,
+        "redirect_uri": redirect_uri,
+        "response_type": "code",
+        "scope": "openid email profile",
+        "access_type": "offline",
+        "prompt": "select_account",
+        "state": state,
+    }
+    await db.oauth_states.insert_one({"state": state, "platform": "google_login", "created_at": datetime.now(timezone.utc).isoformat()})
+    auth_url = "https://accounts.google.com/o/oauth2/v2/auth?" + "&".join(f"{k}={requests.utils.quote(str(v))}" for k, v in params.items())
+    return RedirectResponse(auth_url)
+
+@api_router.get("/auth/google/callback")
+async def google_callback(code: str = Query(None), state: str = Query(None), error: str = Query(None), response: Response = None):
+    """Handle Google OAuth callback, create/login user, redirect to frontend."""
+    frontend_url = os.environ.get("FRONTEND_URL", "")
+    if not frontend_url:
+        # In Replit, frontend and backend share the same proxied domain
+        frontend_url = PUBLIC_BACKEND_URL
+
+    if error:
+        return RedirectResponse(f"{frontend_url}/login?error=google_denied")
+
+    if not code:
+        return RedirectResponse(f"{frontend_url}/login?error=no_code")
+
+    # Verify state
+    if state:
+        state_doc = await db.oauth_states.find_one({"state": state, "platform": "google_login"})
+        if state_doc:
+            await db.oauth_states.delete_one({"state": state})
+
+    google_client_id = os.environ.get("GOOGLE_CLIENT_ID", "")
+    google_client_secret = os.environ.get("GOOGLE_CLIENT_SECRET", "")
+    redirect_uri = f"{PUBLIC_BACKEND_URL}/api/auth/google/callback"
+
+    # Exchange code for tokens
+    token_resp = requests.post("https://oauth2.googleapis.com/token", data={
+        "code": code,
+        "client_id": google_client_id,
+        "client_secret": google_client_secret,
+        "redirect_uri": redirect_uri,
+        "grant_type": "authorization_code",
+    })
+    if not token_resp.ok:
+        logger.error(f"Google token exchange failed: {token_resp.text}")
+        return RedirectResponse(f"{frontend_url}/login?error=token_exchange")
+
+    token_data = token_resp.json()
+    id_token_str = token_data.get("id_token")
+
+    # Get user info from Google
+    userinfo_resp = requests.get("https://www.googleapis.com/oauth2/v3/userinfo", headers={"Authorization": f"Bearer {token_data['access_token']}"})
+    if not userinfo_resp.ok:
+        return RedirectResponse(f"{frontend_url}/login?error=userinfo")
+
+    ginfo = userinfo_resp.json()
+    email = ginfo.get("email", "").lower()
+    name = ginfo.get("name", email.split("@")[0])
+    google_sub = ginfo.get("sub")
+    picture = ginfo.get("picture", "")
+
+    if not email:
+        return RedirectResponse(f"{frontend_url}/login?error=no_email")
+
+    # Upsert user
+    existing = await db.users.find_one({"email": email})
+    if existing:
+        # Link google_sub if not already linked
+        if not existing.get("google_sub"):
+            await db.users.update_one({"_id": existing["_id"]}, {"$set": {"google_sub": google_sub, "avatar": picture, "status": "active"}})
+        user_id = str(existing["_id"])
+    else:
+        user_doc = {
+            "email": email, "name": name, "role": "user", "status": "active",
+            "google_sub": google_sub, "avatar": picture,
+            "planType": "free", "postsUsedThisMonth": 0,
+            "subscriptionStatus": "inactive", "planExpiryDate": None,
+            "settings": {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True},
+            "created_at": datetime.now(timezone.utc).isoformat(),
+            "onboarding_completed": False,
+        }
+        result = await db.users.insert_one(user_doc)
+        user_id = str(result.inserted_id)
+
+    access_token = create_access_token(user_id, email)
+    refresh_tok = create_refresh_token(user_id)
+
+    await log_event(user_id, "user_login_google", {"email": email})
+
+    # Redirect to frontend with token in URL (frontend picks it up and stores in localStorage)
+    return RedirectResponse(f"{frontend_url}/auth/callback?token={access_token}&refresh={refresh_tok}&provider=google")
+
 
 @api_router.post("/auth/refresh")
 async def refresh_token(request: Request, response: Response):
