@@ -7,6 +7,12 @@ import SchedoraLogo from "@/components/SchedoraLogo";
 
 const API = "/api";
 
+const DEFAULT_PLANS = [
+  { id: "free", name: "Free", price: 0, maxAccounts: 1, maxPostsPerMonth: 10, aiEnabled: false, jobPosting: false, jobExport: false, prioritySupport: false },
+  { id: "pro", name: "Pro", price: 999, maxAccounts: 5, maxPostsPerMonth: 100, aiEnabled: true, jobPosting: true, jobExport: false, prioritySupport: false },
+  { id: "business", name: "Business", price: 2999, maxAccounts: 15, maxPostsPerMonth: "unlimited", aiEnabled: true, jobPosting: true, jobExport: true, prioritySupport: true },
+];
+
 const FEATURES = [
   { key: "maxAccounts", label: "Connected Accounts", format: (v) => v },
   { key: "maxPostsPerMonth", label: "Posts / Month", format: (v) => v === "unlimited" ? "Unlimited" : v },
@@ -18,7 +24,7 @@ const FEATURES = [
 
 export default function PricingPage() {
   const navigate = useNavigate();
-  const [plans, setPlans] = useState([]);
+  const [plans, setPlans] = useState(DEFAULT_PLANS);
   const [currentPlan, setCurrentPlan] = useState(null);
   const [loading, setLoading] = useState(true);
   const [paying, setPaying] = useState(null);
@@ -37,8 +43,8 @@ export default function PricingPage() {
           setCurrentPlan(planRes.data);
         }
       } catch (err) {
-        console.error(err);
-        setPlans([]);
+        console.error("Failed to fetch plans:", err);
+        setPlans(DEFAULT_PLANS);
       } finally {
         setLoading(false);
       }
