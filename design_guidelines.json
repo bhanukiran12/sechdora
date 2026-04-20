@@ -1,0 +1,96 @@
+{
+  "theme": "light",
+  "archetype": "Archetype 3 (Pastel & Soft) with Neo-Brutalist Contrast",
+  "design_philosophy": "A bold, 'impossible to ignore' UI optimized for creators. We use Neo-Brutalism (hard black borders, solid pastel blocks, sharp shadows) to reject standard SaaS minimalism. High contrast, highly legible, optimistic, and tactile. Avoid generic soft gray SaaS interfaces.",
+  "typography": {
+    "heading_font": "Cabinet Grotesk",
+    "body_font": "Satoshi",
+    "mono_font": "JetBrains Mono",
+    "rules": {
+      "h1": "text-4xl sm:text-5xl lg:text-6xl tracking-tighter font-black",
+      "h2": "text-2xl sm:text-3xl lg:text-4xl tracking-tight font-bold",
+      "h3": "text-xl sm:text-2xl font-bold tracking-tight",
+      "body": "text-base leading-relaxed font-medium text-left",
+      "labels": "text-xs tracking-[0.2em] uppercase font-bold text-left"
+    }
+  },
+  "colors": {
+    "background": "#F4F3ED",
+    "surface": "#FFFFFF",
+    "primary": {
+      "DEFAULT": "#FF4500",
+      "hover": "#E03C00",
+      "foreground": "#FFFFFF"
+    },
+    "ai_accent": {
+      "DEFAULT": "#D4FF33",
+      "foreground": "#0A0A0A"
+    },
+    "pastels": {
+      "pink": "#FFB3C6",
+      "blue": "#9BF6FF",
+      "yellow": "#FDFFB6"
+    },
+    "text": {
+      "primary": "#0A0A0A",
+      "secondary": "#4A4A4A",
+      "muted": "#737373"
+    },
+    "border": "#0A0A0A"
+  },
+  "spacing_and_layout": {
+    "container_padding": "p-6 md:p-8 lg:p-12",
+    "bento_grid": "grid grid-cols-1 md:grid-cols-3 lg:grid-cols-4 gap-6 md:gap-8 align-items-start",
+    "card_padding": "p-6 md:p-8",
+    "alignment": "Left-align paragraphs, labels, dense content. Never center-everything."
+  },
+  "surfaces_and_shadows": {
+    "card": "bg-white border-2 border-[#0A0A0A] shadow-[4px_4px_0px_#0A0A0A] rounded-lg",
+    "card_hover": "hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#0A0A0A] transition-all duration-200",
+    "input": "bg-white border-2 border-[#0A0A0A] shadow-[2px_2px_0px_#0A0A0A] focus:outline-none focus:ring-0 focus:border-primary rounded-md px-4 py-2",
+    "button": "font-bold border-2 border-[#0A0A0A] shadow-[4px_4px_0px_#0A0A0A] hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-[2px_2px_0px_#0A0A0A] active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all rounded-md px-6 py-3"
+  },
+  "components_strategy": {
+    "navigation": "Solid background `#F4F3ED` with hard 2px bottom border `#0A0A0A`. Sticky top. Brand logo in `Cabinet Grotesk` font-black.",
+    "dashboard_scheduler": "Calendar UI must use dense mode `grid-cols-7`. Drag and drop items should have the Neo-brutalist card hover effect. Avoid faint gray borders; use distinct black borders for grid lines. Do not use generic Shadcn soft cards.",
+    "ai_content_generator": "Use the `ai_accent` (#D4FF33) for the AI Generation block to make it pop. Use ASCII art loaders or heavy typography for generation states.",
+    "badges": "Pill-shaped, heavy 1.5px border, bright pastel background (pink/blue/yellow) with black text.",
+    "forms": "Inputs must have heavy borders and solid shadows. Over-communicate focus state with a primary color border change. Use Shadcn components but strip the Vercel-look."
+  },
+  "motion_and_interactions": {
+    "hover": "Translate X and Y by 2px/4px to 'push down' the shadow, mimicking a physical button press.",
+    "transitions": "Fast and punchy. `transition-transform duration-150 ease-out`.",
+    "loading": "ASCII art loaders or rapid text marquee 'GENERATING...' instead of standard spinners.",
+    "accessibility": "Respect prefers-reduced-motion."
+  },
+  "icons": {
+    "library": "lucide-react",
+    "style": "Stroke width 2.5 or 3. High contrast, slightly chunky to match the brutalist typography."
+  },
+  "media_urls": {
+    "hero_abstract": {
+      "url": "https://images.unsplash.com/photo-1506784951809-c8e12d77d7f2",
+      "description": "Abstract brutalist calendar representation for landing page or empty states."
+    },
+    "ai_feature": {
+      "url": "https://images.unsplash.com/photo-1506784951809-c8e12d77d7f2",
+      "description": "AI generation abstract UI graphic for the AI Content Engine section."
+    },
+    "auth_background": {
+      "url": "https://images.unsplash.com/photo-1617899644490-fbead7fb6183?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHxjb250ZW50JTIwY3JlYXRvciUyMHdvcmtzcGFjZXxlbnwwfHx8fDE3NzYzNDU0NjF8MA&ixlib=rb-4.1.0&q=85",
+      "description": "Creator workspace desk. Use as a split-screen background for Auth pages (Login/Signup)."
+    }
+  },
+  "instructions_to_main_agent": [
+    "You MUST implement this using Tailwind CSS. Do not use custom CSS files for styles unless absolutely necessary.",
+    "Include Fontshare CDN links for `Cabinet Grotesk` and `Satoshi` in the HTML head.",
+    "All interactive elements MUST have `data-testid` attributes (e.g., data-testid='login-form-submit-button').",
+    "Never use `Inter`, `Roboto`, or generic sans for headings.",
+    "NO PURPLE or TEAL. Use the defined Primary (#FF4500) and AI Accent (#D4FF33).",
+    "All cards, buttons, and inputs MUST feature the 2px black border and hard shadow (`shadow-[4px_4px_0px_#0A0A0A]`).",
+    "Do NOT use transparent backgrounds for text-heavy areas over images.",
+    "Forms must use customized Shadcn components but override their borders and shadows to match the neo-brutalist theme.",
+    "The layout must be built with a Dashboard sidebar and a main content area using the Bento grid for analytics.",
+    "For the calendar scheduler, use a 7-column CSS grid. Day cells must have 1px solid black borders, not faint gray."
+  ]
+}

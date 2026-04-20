@@ -1,0 +1,15 @@
+node_modules
+frontend/node_modules
+backend/__pycache__
+frontend/build
+frontend/dist
+.git
+.github
+.idea
+.vscode
+.env
+.env.*
+*.log
+test_reports
+coverage
+dist

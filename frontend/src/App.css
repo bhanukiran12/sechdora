@@ -1,0 +1,38 @@
+.brutal-card {
+  @apply bg-white border-2 border-[#0A0A0A] shadow-brutal rounded-xl;
+}
+
+.brutal-card-hover {
+  @apply hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-hover transition-all duration-200;
+}
+
+.brutal-input {
+  @apply bg-white border-2 border-[#0A0A0A] shadow-brutalInput focus:outline-none focus:ring-0 focus:border-primary rounded-xl px-4 py-2;
+}
+
+.brutal-button {
+  @apply font-bold border-2 border-[#0A0A0A] shadow-brutal hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-hover active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all rounded-xl px-6 py-3;
+}
+
+.calendar-grid {
+  display: grid;
+  grid-template-columns: repeat(7, 1fr);
+  gap: 1px;
+  background: #0A0A0A;
+}
+
+.calendar-day {
+  background: white;
+  border: 1px solid #0A0A0A;
+  min-height: 120px;
+  padding: 8px;
+}
+
+@keyframes marquee {
+  0% { transform: translateX(100%); }
+  100% { transform: translateX(-100%); }
+}
+
+.ai-loading {
+  animation: marquee 2s linear infinite;
+}
