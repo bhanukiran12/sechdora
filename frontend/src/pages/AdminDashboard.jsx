@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from 'react';
+import { useState, useEffect, useCallback, useMemo } from 'react';
 import axios from 'axios';
 import {
   Users, BarChart3, MessageSquare, Settings, CheckCircle2,
@@ -42,7 +42,7 @@ export default function AdminDashboard() {
   const navigate = useNavigate();
 
   const authToken = localStorage.getItem('access_token');
-  const headers = { Authorization: `Bearer ${authToken}` };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${authToken}` }), [authToken]);
 
   const fetchData = useCallback(async () => {
     setLoading(true);

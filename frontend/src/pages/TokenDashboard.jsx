@@ -1,4 +1,4 @@
-import { useState, useEffect, useCallback } from "react";
+import { useState, useEffect, useCallback, useMemo } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { useNavigate } from "react-router-dom";
@@ -59,7 +59,7 @@ export default function TokenDashboard() {
   const [buying, setBuying] = useState(null);
 
   const authToken = localStorage.getItem("access_token");
-  const headers = { Authorization: `Bearer ${authToken}` };
+  const headers = useMemo(() => ({ Authorization: `Bearer ${authToken}` }), [authToken]);
 
   const fetchData = useCallback(async () => {
     try {
