@@ -5,6 +5,7 @@
 
 [build.environment]
   NODE_VERSION = "20"
+  REACT_APP_BACKEND_URL = "https://sechdora.onrender.com"
 
 [[redirects]]
   from = "/*"
