@@ -646,6 +646,7 @@ async def register(user_data: UserRegister):
         "email": email, "password_hash": hash_password(user_data.password),
         "name": user_data.name, "role": "user", "status": "unverified",
         "planType": "free", "postsUsedThisMonth": 0,
+        "tokens": 10,  # Free tokens for new users
         "subscriptionStatus": "inactive", "planExpiryDate": None,
         "settings": {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True},
         "created_at": datetime.now(timezone.utc).isoformat()
@@ -2280,6 +2281,7 @@ async def get_user_plan(user: dict = Depends(get_current_user)):
         "connectedAccountsCount": connected,
         "subscriptionStatus": user.get("subscriptionStatus", "inactive"),
         "planExpiryDate": user.get("planExpiryDate"),
+        "tokens": user.get("tokens", 0),
     }
 
 class CreateOrderRequest(BaseModel):

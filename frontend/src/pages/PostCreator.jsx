@@ -1,10 +1,12 @@
 import { useNavigate } from "react-router-dom";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { toast } from "sonner";
 import { Upload, Sparkles, ArrowLeft, Image as ImageIcon, Eye, PenLine, ShieldCheck, Lightbulb, Loader2, CalendarDays, Clock3 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import PostPreview from "@/components/PostPreview";
+import TokenWarningModal from "@/components/TokenWarningModal";
+import { detectUrl, calculateTokenCost } from "@/utils/tokens";
 
 const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
 const API = `${BACKEND_URL}/api`;
@@ -32,6 +34,8 @@ export default function PostCreator() {
   const [recurrence, setRecurrence] = useState('none');
   const [autoRetry, setAutoRetry] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
+  const [tokenWarning, setTokenWarning] = useState({ open: false, tokensRequired: 3 });
+  const [pendingPostStatus, setPendingPostStatus] = useState(null);
 
   const formatLocalDateInput = (date) => {
     const year = date.getFullYear();
@@ -202,17 +206,19 @@ export default function PostCreator() {
     if (selectedPlatforms.length === 0) { toast.error('Select at least one platform'); return; }
     if (selectedPlatforms.includes('twitter') && content.length > 280) { toast.error('Twitter posts must be 280 characters or fewer'); return; }
     if (status === 'scheduled' && (!scheduledDate || !scheduledClock)) { toast.error('Select a schedule date and time'); return; }
-    const accountValidationError = status === 'draft' ? null : ['twitter', 'linkedin'].find((platformId) => {
-      if (!selectedPlatforms.includes(platformId)) return false;
-      const available = connectedAccounts.filter((account) => account.platform === platformId);
-      if (available.length === 0) return true;
-      return !(targetAccounts[platformId] && targetAccounts[platformId].length > 0);
-    });
-    if (accountValidationError) {
-      const hasAccounts = connectedAccounts.some((account) => account.platform === accountValidationError);
-      toast.error(hasAccounts ? `Select at least one ${accountValidationError === 'twitter' ? 'Twitter' : 'LinkedIn'} account` : `Connect a ${accountValidationError === 'twitter' ? 'Twitter' : 'LinkedIn'} account first`);
+
+    const { tokensRequired, type } = calculateTokenCost(content);
+    
+    if (type === 'url' && status === 'scheduled') {
+      setTokenWarning({ open: true, tokensRequired });
+      setPendingPostStatus(status);
       return;
     }
+    
+    await executePostCreation(status);
+  };
+
+  const executePostCreation = async (status) => {
     try {
       const token = localStorage.getItem('access_token');
       const scheduledTime = status === 'scheduled' && scheduledDate && scheduledClock
@@ -226,14 +232,63 @@ export default function PostCreator() {
       }, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true });
       toast.success(status === 'scheduled' ? 'Post scheduled!' : 'Draft saved!');
       navigate('/dashboard');
+} catch (error) {
+      if (error.response?.data?.detail?.includes('credits') || error.response?.data?.detail?.includes('tokens')) {
+        toast.error(error.response.data.detail);
+      } else {
+        toast.error('Failed to create post');
+      }
+    }
+  };
+
+  const handlePostConfirm = async () => {
+    setTokenWarning({ open: false, tokensRequired: 3 });
+    const accountValidationError = ['twitter', 'linkedin'].find((platformId) => {
+      if (!selectedPlatforms.includes(platformId)) return false;
+      const available = connectedAccounts.filter((account) => account.platform === platformId);
+      if (available.length === 0) return true;
+      return !(targetAccounts[platformId] && targetAccounts[platformId].length > 0);
+    });
+    if (accountValidationError) {
+      const hasAccounts = connectedAccounts.some((account) => account.platform === accountValidationError);
+      toast.error(hasAccounts ? `Select at least one ${accountValidationError === 'twitter' ? 'Twitter' : 'LinkedIn'} account` : `Connect a ${accountValidationError === 'twitter' ? 'Twitter' : 'LinkedIn'} account first`);
+      return;
+    }
+    await executePostCreation(pendingPostStatus || 'scheduled');
+    setPendingPostStatus(null);
+  };
+
+  const handleOptimizeAndPost = async () => {
+    setTokenWarning({ open: false, tokensRequired: 3 });
+    setGenerating(true);
+    try {
+      const token = localStorage.getItem('access_token');
+      const response = await axios.post(`${API}/ai/optimize-post`, 
+        { content, optimize_for: 'no_link' },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      setContent(response.data.optimized_content || response.data.content);
+      toast.success('Post optimized! Link removed and converted to CTA.');
     } catch (error) {
-      toast.error('Failed to create post');
+      toast.error('Failed to optimize post');
+    } finally {
+      setGenerating(false);
+      setPendingPostStatus(null);
     }
   };
 
   return (
-    <div className="flex" data-testid="post-creator-container">
-      <Sidebar active="create" />
+    <>
+      <TokenWarningModal
+        isOpen={tokenWarning.open}
+        onClose={() => setTokenWarning({ open: false, tokensRequired: 3 })}
+        onConfirm={handlePostConfirm}
+        onOptimize={handleOptimizeAndPost}
+        tokensRequired={tokenWarning.tokensRequired}
+        content={content}
+      />
+      <div className="flex" data-testid="post-creator-container">
+        <Sidebar active="create" />
       <main className="flex-1 bg-background p-6 md:p-12">
         <button onClick={() => navigate('/dashboard')} className="mb-6 flex items-center gap-2 text-text-secondary hover:text-text-primary transition-colors" data-testid="back-to-dashboard">
           <ArrowLeft className="w-5 h-5" /> Back to Dashboard
@@ -521,6 +576,7 @@ export default function PostCreator() {
           )}
         </div>
       </main>
-    </div>
+      </div>
+    </>
   );
 }
