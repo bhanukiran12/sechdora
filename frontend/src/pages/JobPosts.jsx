@@ -146,7 +146,7 @@ export default function JobPosts() {
               "bg-gray-100 text-gray-700"
             }`}>
               {planInfo.plan?.aiEnabled && <Sparkles className="w-4 h-4" strokeWidth={3} />}
-              {planInfo.planType.charAt(0).toUpperCase() + planInfo.planType.slice(1)} Plan
+              {(planInfo.planType || 'free').charAt(0).toUpperCase() + (planInfo.planType || 'free').slice(1)} Plan
               {planInfo.plan?.aiEnabled && " · AI Enabled"}
             </div>
           )}
