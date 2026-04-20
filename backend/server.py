@@ -1241,6 +1241,15 @@ async def create_post(post_data: PostCreate, user: dict = Depends(get_current_us
     }
     await db.posts.insert_one(post_doc)
     await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$inc": {"postsUsedThisMonth": 1}})
+    
+    # Token deduction for scheduled posts
+    if status == "scheduled" and review_status == "approved":
+        cost = calculate_token_cost(post_data.content)
+        success, msg = await deduct_tokens(user, cost["tokensRequired"])
+        if not success:
+            raise HTTPException(status_code=402, detail=msg)
+        await log_token_usage(user, "post", cost["type"], cost["tokensRequired"])
+    
     await log_audit(user["_id"], "post.created", "post", post_id, {"platforms": post_data.platforms, "status": status, "recurrence": post_data.recurrence})
 
     if status == "scheduled" and post_data.scheduled_time and review_status == "approved":
@@ -1498,6 +1507,40 @@ Hook in first 5 words, keep it concise, optimize for {request.platform}, and inc
         if "?" not in improved and "!" not in improved:
             improved += " What do you think?"
         return {"improved_caption": improved}
+
+@api_router.post("/ai/optimize-post")
+async def optimize_post(request: dict, user: dict = Depends(get_current_user)):
+    """Optimize post by removing URLs and converting to engaging CTA."""
+    content = request.get("content", "")
+    optimize_for = request.get("optimize_for", "no_link")
+    
+    if not content:
+        raise HTTPException(status_code=400, detail="Content is required")
+    
+    if not GEMINI_API_KEY:
+        return {"optimized_content": content, "message": "AI not configured, returning original"}
+    
+    try:
+        prompt = f"""Transform this social media post by removing any URLs/links and converting them into engaging call-to-action text.
+        Original post: "{content}"
+        Requirements: 
+        - Remove any URLs or links
+        - Convert the link mention into a compelling CTA like "Link in bio" or "Learn more at [brand]"
+        - Keep it under 280 characters for Twitter
+        - Make it engaging and actionable
+        Return ONLY the optimized post text, nothing else."""
+        
+        model = genai.GenerativeModel("gemma-3-4b-it", system_instruction="You are a social media copywriting expert.")
+        response_obj = await asyncio.to_thread(model.generate_content, prompt)
+        optimized = (response_obj.text or "").strip()
+        
+        if not optimized:
+            return {"optimized_content": content, "message": "AI returned empty, using original"}
+        
+        return {"optimized_content": optimized, "message": "Post optimized successfully"}
+    except Exception as e:
+        logger.error(f"AI optimize error: {e}")
+        return {"optimized_content": content, "message": "AI error, using original"}
 
 
 # ========== ANALYTICS ==========
