@@ -44,7 +44,6 @@ export default function PricingPage() {
         }
       } catch (err) {
         console.error("Failed to fetch plans:", err);
-        setPlans(DEFAULT_PLANS);
       } finally {
         setLoading(false);
       }
