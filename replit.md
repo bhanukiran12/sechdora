@@ -69,3 +69,10 @@ User fields: `planType`, `postsUsedThisMonth`, `subscriptionStatus`, `planExpiry
 - `backend/server.py` — FastAPI server (all routes in one file)
 - `backend/requirements.txt` — Python dependencies
 - `frontend/package.json` — Node dependencies (yarn)
+
+## Replit Migration Notes
+- Both workflows start automatically via the "Project" parallel workflow
+- Frontend packages are installed in `frontend/node_modules` (yarn)
+- Backend packages installed system-wide via pip
+- `core-js-pure` was replaced from root `node_modules` to fix incomplete install in `frontend/node_modules`
+- Lucide-react source map warnings are harmless — no .map files shipped with that package version
