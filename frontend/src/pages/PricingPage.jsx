@@ -132,7 +132,7 @@ export default function PricingPage() {
           <p className="text-text-secondary text-lg max-w-xl mx-auto">
             Start free. Upgrade when you need more power.
           </p>
-          {currentPlan && (
+          {currentPlan?.planType && (
             <div className="mt-4 inline-block bg-yellow-100 border-2 border-yellow-400 rounded-full px-5 py-2 font-bold text-sm text-yellow-800">
               Current plan: {currentPlan.planType.charAt(0).toUpperCase() + currentPlan.planType.slice(1)}
             </div>
