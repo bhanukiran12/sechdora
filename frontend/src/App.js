@@ -23,6 +23,7 @@ import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import PricingPage from "@/pages/PricingPage";
 import JobPosts from "@/pages/JobPosts";
+import TokenDashboard from "@/pages/TokenDashboard";
 import FeedbackModal from "@/components/FeedbackModal";
 import { MessageSquare } from "lucide-react";
 
@@ -107,6 +108,7 @@ function AppRouter() {
       <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
       <Route path="/pricing" element={<PricingPage />} />
       <Route path="/jobs" element={<ProtectedRoute><JobPosts /></ProtectedRoute>} />
+      <Route path="/tokens" element={<ProtectedRoute><TokenDashboard /></ProtectedRoute>} />
     </Routes>
   );
 }

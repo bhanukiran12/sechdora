@@ -32,6 +32,7 @@ export default function PostCreator() {
   const [uploading, setUploading] = useState(false);
   const [generating, setGenerating] = useState(false);
   const [recurrence, setRecurrence] = useState('none');
+  const [customInterval, setCustomInterval] = useState({ value: 1, unit: 'hours' });
   const [autoRetry, setAutoRetry] = useState(true);
   const [showPreview, setShowPreview] = useState(false);
   const [tokenWarning, setTokenWarning] = useState({ open: false, tokensRequired: 3 });
@@ -218,6 +219,10 @@ export default function PostCreator() {
     await executePostCreation(status);
   };
 
+  const effectiveRecurrence = recurrence === 'custom'
+    ? `every_${customInterval.value}_${customInterval.unit}`
+    : recurrence;
+
   const executePostCreation = async (status) => {
     try {
       const token = localStorage.getItem('access_token');
@@ -228,7 +233,7 @@ export default function PostCreator() {
         content, platforms: selectedPlatforms, platform_captions: platformCaptions,
         target_accounts: targetAccounts,
         media_urls: mediaUrls, scheduled_time: scheduledTime,
-        status, recurrence, auto_retry: autoRetry
+        status, recurrence: effectiveRecurrence, auto_retry: autoRetry
       }, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true });
       toast.success(status === 'scheduled' ? 'Post scheduled!' : 'Draft saved!');
       navigate('/dashboard');
@@ -488,14 +493,37 @@ export default function PostCreator() {
                 </div>
               </div>
 
-              <label className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-3 block">Recurrence</label>
-              <div className="flex gap-2 flex-wrap mb-4">
-                {['none', 'daily', 'weekly', 'monthly'].map(r => (
-                  <button key={r} onClick={() => setRecurrence(r)} className={`px-4 py-2 rounded-full border-2 border-border font-medium text-sm shadow-brutalSoft ${recurrence === r ? 'bg-primary text-white' : 'bg-white'}`} data-testid={`recurrence-${r}`}>
-                    {r === 'none' ? 'One-time' : r.charAt(0).toUpperCase() + r.slice(1)}
+              <label className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-3 block">Repeat Post</label>
+              <div className="flex gap-2 flex-wrap mb-3">
+                {['none', 'daily', 'weekly', 'monthly', 'custom'].map(r => (
+                  <button key={r} onClick={() => setRecurrence(r)} className={`px-4 py-2 rounded-full border-2 border-border font-medium text-sm shadow-brutalSoft ${recurrence === r ? 'bg-primary text-white border-primary' : 'bg-white'}`} data-testid={`recurrence-${r}`}>
+                    {r === 'none' ? 'One-time' : r === 'custom' ? 'Custom' : r.charAt(0).toUpperCase() + r.slice(1)}
                   </button>
                 ))}
               </div>
+              {recurrence === 'custom' && (
+                <div className="flex items-center gap-3 mb-4 p-3 bg-white border-2 border-primary rounded-xl">
+                  <span className="text-sm font-bold text-text-muted">Every</span>
+                  <input
+                    type="number"
+                    min={1}
+                    max={999}
+                    value={customInterval.value}
+                    onChange={(e) => setCustomInterval(prev => ({ ...prev, value: Math.max(1, parseInt(e.target.value) || 1) }))}
+                    className="brutal-input w-20 text-center font-black"
+                  />
+                  <select
+                    value={customInterval.unit}
+                    onChange={(e) => setCustomInterval(prev => ({ ...prev, unit: e.target.value }))}
+                    className="brutal-input font-bold"
+                  >
+                    <option value="minutes">Minutes</option>
+                    <option value="hours">Hours</option>
+                    <option value="days">Days</option>
+                  </select>
+                  <span className="text-xs font-bold text-primary">{customInterval.value} {customInterval.unit}</span>
+                </div>
+              )}
 
               <label className="flex items-center gap-3 cursor-pointer" data-testid="auto-retry-toggle">
                 <div className={`w-12 h-6 rounded-full border-2 border-border relative transition-colors ${autoRetry ? 'bg-primary' : 'bg-gray-200'}`} onClick={() => setAutoRetry(!autoRetry)}>
@@ -528,7 +556,11 @@ export default function PostCreator() {
                   <Loader2 className="w-5 h-5 animate-spin" />
                 ) : (
                   (scheduledDate && scheduledClock)
-                    ? (recurrence !== 'none' ? `Schedule ${recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}` : 'Schedule Post')
+                    ? (recurrence !== 'none'
+                        ? recurrence === 'custom'
+                          ? `Repeat Every ${customInterval.value} ${customInterval.unit}`
+                          : `Schedule ${recurrence.charAt(0).toUpperCase() + recurrence.slice(1)}`
+                        : 'Schedule Post')
                     : 'Publish Now'
                 )}
               </button>

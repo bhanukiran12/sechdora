@@ -82,7 +82,30 @@ TOKEN_COSTS = {
     "ai_caption": 1,
     "standard_post": 3,
     "url_post": 20,
+    "job_generation": 15,
+    "job_export": 10,
+    "lead_outreach": 10,
 }
+
+TOKEN_PACKS = {
+    "pack_200": {"tokens": 200, "price": 199, "label": "Starter"},
+    "pack_500": {"tokens": 500, "price": 399, "label": "Pro"},
+    "pack_1000": {"tokens": 1000, "price": 699, "label": "Power"},
+}
+
+_rate_limit_store: dict = {}
+
+def check_rate_limit(user_id: str, action: str, max_per_minute: int = 10) -> bool:
+    import time
+    key = f"{user_id}:{action}"
+    now = time.time()
+    hits = _rate_limit_store.get(key, [])
+    hits = [t for t in hits if now - t < 60]
+    if len(hits) >= max_per_minute:
+        return False
+    hits.append(now)
+    _rate_limit_store[key] = hits
+    return True
 
 def detect_url(content):
     """Detect URLs in content."""
@@ -1222,6 +1245,8 @@ async def download_media(path: str, authorization: str = Header(None), auth: str
 # ========== POSTS WITH RECURRING ==========
 @api_router.post("/posts")
 async def create_post(post_data: PostCreate, user: dict = Depends(get_current_user)):
+    if not check_rate_limit(str(user["_id"]), "create_post", 20):
+        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
     await enforce_post_limit(user)
     post_id = f"post_{uuid.uuid4().hex[:12]}"
     status = post_data.status or "draft"
@@ -1736,24 +1761,38 @@ async def get_team_members(user: dict = Depends(get_current_user)):
 
 # ========== PUBLISHING + AUTO-RETRY + RECURRING ==========
 def schedule_post(post_id: str, scheduled_time: str, recurrence: str = None):
+    from apscheduler.triggers.interval import IntervalTrigger
     try:
         scheduled_dt = datetime.fromisoformat(scheduled_time)
         if scheduled_dt.tzinfo is None:
             scheduled_dt = scheduled_dt.replace(tzinfo=timezone.utc)
-        
+
         if recurrence and recurrence != "none":
-            # Recurring: add cron trigger
-            if recurrence == "daily":
+            trigger = None
+            # Custom interval patterns: every_N_minutes, every_N_hours, every_N_days
+            import re as _re
+            m = _re.match(r"every_(\d+)_(minutes?|hours?|days?)", recurrence)
+            if m:
+                n = int(m.group(1))
+                unit = m.group(2).rstrip("s")
+                if unit == "minute":
+                    trigger = IntervalTrigger(minutes=n, start_date=scheduled_dt)
+                elif unit == "hour":
+                    trigger = IntervalTrigger(hours=n, start_date=scheduled_dt)
+                elif unit == "day":
+                    trigger = IntervalTrigger(days=n, start_date=scheduled_dt)
+            elif recurrence == "daily":
                 trigger = CronTrigger(hour=scheduled_dt.hour, minute=scheduled_dt.minute)
             elif recurrence == "weekly":
                 trigger = CronTrigger(day_of_week=scheduled_dt.strftime("%a").lower()[:3], hour=scheduled_dt.hour, minute=scheduled_dt.minute)
             elif recurrence == "monthly":
                 trigger = CronTrigger(day=scheduled_dt.day, hour=scheduled_dt.hour, minute=scheduled_dt.minute)
+
+            if trigger:
+                scheduler.add_job(publish_recurring_post, trigger=trigger, args=[post_id], id=f"post_{post_id}", replace_existing=True)
+                logger.info(f"Recurring post {post_id} scheduled ({recurrence})")
             else:
-                trigger = DateTrigger(run_date=scheduled_dt)
-            
-            scheduler.add_job(publish_recurring_post, trigger=trigger, args=[post_id], id=f"post_{post_id}", replace_existing=True)
-            logger.info(f"Recurring post {post_id} scheduled ({recurrence})")
+                scheduler.add_job(publish_post, trigger=DateTrigger(run_date=scheduled_dt), args=[post_id], id=f"post_{post_id}", replace_existing=True)
         else:
             scheduler.add_job(publish_post, trigger=DateTrigger(run_date=scheduled_dt), args=[post_id], id=f"post_{post_id}", replace_existing=True)
             logger.info(f"Scheduled post {post_id} for {scheduled_time}")
@@ -2215,31 +2254,231 @@ async def delete_own_account(user: dict = Depends(get_current_user)):
 async def get_admin_stats(user: dict = Depends(get_current_user)):
     if user["role"] not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
-    
+
     total_users = await db.users.count_documents({})
     verified_users = await db.users.count_documents({"status": "verified"})
     total_posts = await db.posts.count_documents({"status": "published"})
     connected_accounts = await db.social_accounts.count_documents({"status": "connected"})
-    
-    # Platform breakdown
+
     platforms = ["twitter", "linkedin", "instagram", "facebook", "youtube"]
     platform_stats = {}
     for p in platforms:
         platform_stats[p] = await db.social_accounts.count_documents({"platform": p, "status": "connected"})
-        
+
+    # Revenue from payments
+    all_payments = await db.payments.find({}).to_list(10000)
+    total_revenue = sum(p.get("amount", 0) for p in all_payments)
+    token_revenue = sum(p.get("amount", 0) for p in all_payments if p.get("type") == "token_purchase")
+    plan_revenue = total_revenue - token_revenue
+
+    # Token usage stats
+    token_logs = await db.token_logs.find({}).to_list(10000)
+    total_tokens_used = sum(t.get("tokens", 0) for t in token_logs)
+    token_breakdown = {}
+    for t in token_logs:
+        k = t.get("type", "unknown")
+        token_breakdown[k] = token_breakdown.get(k, 0) + t.get("tokens", 0)
+
+    # Active users (posted in last 7 days)
+    seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+    active_users = await db.posts.distinct("user_id", {"created_at": {"$gte": seven_days_ago}})
+
+    # Feedback summary
+    all_feedback = await db.feedback.find({}).to_list(10000)
+    avg_rating = round(sum(f.get("rating", 0) for f in all_feedback) / len(all_feedback), 1) if all_feedback else 0
+    tag_counts: dict = {}
+    for f in all_feedback:
+        for tag in f.get("tags", []):
+            tag_counts[tag] = tag_counts.get(tag, 0) + 1
+    top_tags = sorted(tag_counts.items(), key=lambda x: -x[1])[:5]
+
     return {
         "total_users": total_users,
         "verified_users": verified_users,
         "total_posts": total_posts,
         "connected_accounts": connected_accounts,
-        "platform_stats": platform_stats
+        "platform_stats": platform_stats,
+        "revenue": {
+            "total": total_revenue,
+            "from_plans": plan_revenue,
+            "from_tokens": token_revenue,
+        },
+        "tokens": {
+            "total_used": total_tokens_used,
+            "breakdown": token_breakdown,
+        },
+        "active_users_7d": len(active_users),
+        "feedback": {
+            "total": len(all_feedback),
+            "avg_rating": avg_rating,
+            "top_tags": [{"tag": k, "count": v} for k, v in top_tags],
+        },
     }
+
 
 @api_router.get("/admin/feedback")
 async def get_admin_feedback(user: dict = Depends(get_current_user)):
     if user["role"] not in ["admin", "owner"]:
         raise HTTPException(status_code=403, detail="Admin access required")
     return await db.feedback.find({}, {"_id": 0}).sort("created_at", -1).limit(100).to_list(100)
+
+
+@api_router.get("/admin/users")
+async def get_admin_users(user: dict = Depends(get_current_user)):
+    if user["role"] not in ["admin", "owner"]:
+        raise HTTPException(status_code=403, detail="Admin access required")
+
+    all_users = await db.users.find(
+        {}, {"email": 1, "name": 1, "planType": 1, "tokens": 1, "postsUsedThisMonth": 1, "created_at": 1, "role": 1}
+    ).to_list(500)
+
+    thirty_days_ago = (datetime.now(timezone.utc) - timedelta(days=30)).isoformat()
+    seven_days_ago = (datetime.now(timezone.utc) - timedelta(days=7)).isoformat()
+
+    result = []
+    for u in all_users:
+        uid = u["_id"]
+        post_count = await db.posts.count_documents({"user_id": uid})
+        recent_posts = await db.posts.count_documents({"user_id": uid, "created_at": {"$gte": seven_days_ago}})
+        old_posts = await db.posts.count_documents({"user_id": uid, "created_at": {"$gte": thirty_days_ago}})
+        token_used = await db.token_logs.count_documents({"user_id": uid})
+
+        result.append({
+            "id": str(uid),
+            "email": u.get("email", ""),
+            "name": u.get("name", ""),
+            "plan": u.get("planType", "free"),
+            "tokens": u.get("tokens", 0),
+            "postsThisMonth": u.get("postsUsedThisMonth", 0),
+            "totalPosts": post_count,
+            "recentPosts7d": recent_posts,
+            "tokenActionsTotal": token_used,
+            "status": "active" if recent_posts > 0 else ("at_risk" if old_posts > 0 else "inactive"),
+            "joinedAt": u.get("created_at", ""),
+        })
+
+    result.sort(key=lambda x: -x["tokens"])
+    return result
+
+
+# ─── Token Purchase Endpoints ─────────────────────────────────────────────────
+
+@api_router.get("/tokens/packs")
+async def get_token_packs():
+    return [{"id": k, **v} for k, v in TOKEN_PACKS.items()]
+
+
+@api_router.get("/tokens/history")
+async def get_token_history(user: dict = Depends(get_current_user), limit: int = 50):
+    logs = await db.token_logs.find({"user_id": user["_id"]}).sort("createdAt", -1).limit(limit).to_list(limit)
+    for log in logs:
+        log["_id"] = str(log["_id"])
+        log["user_id"] = str(log.get("user_id", ""))
+    return logs
+
+
+@api_router.get("/tokens/stats")
+async def get_token_stats(user: dict = Depends(get_current_user)):
+    balance = user.get("tokens", 0)
+    logs = await db.token_logs.find({"user_id": user["_id"]}).to_list(10000)
+
+    breakdown: dict = {}
+    for log in logs:
+        k = log.get("type", "unknown")
+        breakdown[k] = breakdown.get(k, 0) + log.get("tokens", 0)
+
+    total_used = sum(breakdown.values())
+
+    # Smart insight
+    insights = []
+    url_used = breakdown.get("url", 0)
+    standard_used = breakdown.get("standard", 0)
+    if url_used > standard_used and total_used > 0:
+        insights.append("You post many links — switching to standard posts can cut your credit usage by up to 85%.")
+    if balance < 20:
+        insights.append("Your balance is low. Consider buying more credits to keep scheduling uninterrupted.")
+    if breakdown.get("ai_caption", 0) > 10:
+        insights.append("You're getting great value from AI captions — keep it up!")
+
+    # Posts left estimate (based on avg cost)
+    avg_cost = (total_used / len(logs)) if logs else 3
+    posts_left = int(balance / avg_cost) if avg_cost > 0 else int(balance / 3)
+
+    plan = get_plan(user)
+    return {
+        "balance": balance,
+        "postsLeft": posts_left,
+        "totalUsed": total_used,
+        "breakdown": breakdown,
+        "insights": insights,
+        "planType": user.get("planType", "free"),
+        "planName": plan.get("name", "Free"),
+        "recentLogs": [
+            {
+                "action": log.get("action", ""),
+                "type": log.get("type", ""),
+                "tokens": log.get("tokens", 0),
+                "createdAt": log.get("createdAt", "").isoformat() if hasattr(log.get("createdAt", ""), "isoformat") else str(log.get("createdAt", "")),
+            }
+            for log in logs[:20]
+        ],
+    }
+
+
+class BuyTokensRequest(BaseModel):
+    pack_id: str
+
+
+@api_router.post("/tokens/buy")
+async def buy_tokens_order(data: BuyTokensRequest, user: dict = Depends(get_current_user)):
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=503, detail="Payment service not configured.")
+    pack = TOKEN_PACKS.get(data.pack_id)
+    if not pack:
+        raise HTTPException(status_code=400, detail="Invalid token pack selected.")
+    client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+    order = client_rz.order.create({
+        "amount": pack["price"] * 100,
+        "currency": "INR",
+        "receipt": f"tok_{str(user['_id'])[:8]}_{data.pack_id}",
+        "notes": {"user_id": str(user["_id"]), "pack_id": data.pack_id, "tokens": pack["tokens"]},
+    })
+    return {"order_id": order["id"], "amount": order["amount"], "currency": order["currency"], "key": RAZORPAY_KEY_ID, "tokens": pack["tokens"], "pack": pack}
+
+
+class VerifyTokenPurchaseRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    pack_id: str
+
+
+@api_router.post("/tokens/verify-purchase")
+async def verify_token_purchase(data: VerifyTokenPurchaseRequest, user: dict = Depends(get_current_user)):
+    if not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=503, detail="Payment service not configured.")
+    pack = TOKEN_PACKS.get(data.pack_id)
+    if not pack:
+        raise HTTPException(status_code=400, detail="Invalid pack.")
+    try:
+        client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        client_rz.utility.verify_payment_signature({
+            "razorpay_order_id": data.razorpay_order_id,
+            "razorpay_payment_id": data.razorpay_payment_id,
+            "razorpay_signature": data.razorpay_signature,
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="Payment verification failed.")
+    await db.users.update_one({"_id": user["_id"]}, {"$inc": {"tokens": pack["tokens"]}})
+    await db.payments.insert_one({
+        "user_id": user["_id"], "type": "token_purchase", "pack_id": data.pack_id,
+        "tokens": pack["tokens"], "amount": pack["price"],
+        "razorpay_order_id": data.razorpay_order_id, "razorpay_payment_id": data.razorpay_payment_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await log_token_usage(user, "token_purchase", "credit", -pack["tokens"])
+    logger.info(f"Token purchase: user {user['_id']} bought {pack['tokens']} tokens ({data.pack_id})")
+    return {"success": True, "tokens_added": pack["tokens"], "message": f"{pack['tokens']} credits added to your account!"}
 
 
 # ========== ADMIN SEEDING ==========
@@ -2401,6 +2640,15 @@ async def list_job_posts(user: dict = Depends(get_current_user)):
 @api_router.post("/job-posts")
 async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobPosting")
+    if not check_rate_limit(str(user["_id"]), "job_create", 5):
+        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
+    job_cost = TOKEN_COSTS["job_generation"]
+    ok, msg = await deduct_tokens(user, job_cost)
+    if not ok:
+        raise HTTPException(status_code=402, detail=msg)
+    await log_token_usage(user, "job_generation", "job_generation", job_cost)
+    user = await db.users.find_one({"_id": user["_id"]})
+
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     content = f"{job.title} at {job.company}\n\n{job.description}"
     if get_plan(user)["aiEnabled"] and GEMINI_API_KEY:
@@ -2421,11 +2669,27 @@ async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_u
         "description": job.description, "requirements": job.requirements,
         "salary": job.salary, "job_type": job.job_type,
         "generated_content": content, "can_export": get_plan(user)["jobExport"],
+        "tokens_used": job_cost,
         "created_at": datetime.now(timezone.utc).isoformat(),
     }
     await db.job_posts.insert_one(doc)
     doc.pop("_id", None)
     return doc
+
+
+@api_router.post("/job-posts/{job_id}/export")
+async def export_job_post(job_id: str, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobExport")
+    post = await db.job_posts.find_one({"job_id": job_id, "user_id": user["_id"]})
+    if not post:
+        raise HTTPException(status_code=404, detail="Job post not found")
+    export_cost = TOKEN_COSTS["job_export"]
+    ok, msg = await deduct_tokens(user, export_cost)
+    if not ok:
+        raise HTTPException(status_code=402, detail=msg)
+    await log_token_usage(user, "job_export", "job_export", export_cost)
+    return {"content": post.get("generated_content", ""), "title": post.get("title", ""), "tokens_used": export_cost}
+
 
 @api_router.delete("/job-posts/{job_id}")
 async def delete_job_post(job_id: str, user: dict = Depends(get_current_user)):

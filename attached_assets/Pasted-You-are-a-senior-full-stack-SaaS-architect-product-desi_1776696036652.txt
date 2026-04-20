@@ -1,0 +1,285 @@
+You are a senior full-stack SaaS architect, product designer, and growth engineer.
+
+Build advanced features for "Schedora" — an AI-powered social media scheduler with token-based monetization.
+
+Focus on:
+- Clean UX
+- Profitability (token system)
+- Scalable backend
+- High-conversion flows
+
+----------------------------------------
+GLOBAL DESIGN RULES
+
+- Use modern SaaS UI (clean cards, spacing, soft shadows)
+- Token icon = coin-style (gold gradient, minimal, consistent across app)
+- High contrast for all alerts/errors
+- Avoid clutter
+- Mobile responsive
+
+----------------------------------------
+PART 1: TOKEN SYSTEM (5x PROFIT MODEL)
+
+Define:
+
+1 token = ₹1 value
+
+Token Costs:
+- AI Caption → 1 token
+- Standard Post → 3 tokens
+- URL Post → 20 tokens
+- Job Generation → 15 tokens
+- Job Export / Distribution → 10 tokens
+- Lead outreach (per batch) → 10 tokens
+
+Backend:
+- Deduct tokens before action
+- Block if insufficient
+- Log all token usage
+
+Database:
+
+User {
+  tokensAvailable,
+  planType,
+  usageStats
+}
+
+TokenHistory {
+  userId,
+  action,
+  tokensUsed,
+  type,
+  createdAt
+}
+
+----------------------------------------
+PART 2: URL DETECTION + WARNING
+
+Detect URLs using regex:
+- https://
+- www
+- short links
+
+If detected:
+- Mark as high-cost post
+
+Show modal:
+
+"⚠️ Link detected"
+"This post will use 20 credits. Standard posts use 3."
+
+Buttons:
+- Post Anyway
+- Optimize Post (AI removes link)
+
+----------------------------------------
+PART 3: TOKEN UI (GLOBAL)
+
+- Show token balance in navbar (coin icon)
+- Example:
+  🪙 180
+
+- On hover:
+  "180 credits remaining (~36 posts)"
+
+- Consistent across:
+  Dashboard, Post Creator, Jobs, Settings
+
+----------------------------------------
+PART 4: POST FEEDBACK SYSTEM
+
+Trigger:
+After first successful post
+
+Show popup:
+
+"🎉 Your post is live!"
+"How was your experience?"
+
+Feedback form:
+- Rating (1–5 stars)
+- Quick tags:
+  [Easy to use]
+  [Confusing]
+  [Fast]
+  [Needs improvement]
+
+- Optional text input:
+  "Tell us what can be better"
+
+- CTA:
+  Submit Feedback
+
+Store:
+
+Feedback {
+  userId,
+  rating,
+  tags,
+  message,
+  createdAt
+}
+
+----------------------------------------
+PART 5: TOKEN DASHBOARD (USER)
+
+Page: /tokens
+
+Show:
+
+1. Top card:
+- Tokens remaining
+- "~36 posts left"
+- Renewal date
+- Buttons:
+  Buy Tokens / Upgrade
+
+2. Usage summary:
+- Posts created
+- Jobs generated
+- Outreach done
+
+3. Smart insight:
+- "You used many link posts (high cost)"
+
+4. Activity:
+- Clean readable logs
+
+----------------------------------------
+PART 6: ADMIN PANEL (ADVANCED)
+
+Page: /admin
+
+Sections:
+
+1. USER ANALYTICS
+- Total users
+- Active users
+- Posts created
+- Token usage
+- Revenue vs estimated cost
+
+2. COST TRACKING
+
+Track:
+
+- X API usage cost
+- Gemini API cost
+- Total cost
+- Total revenue
+
+Show:
+
+Profit = revenue - cost
+
+----------------------------------------
+
+3. API RECHARGE LINKS
+
+Provide quick access buttons:
+
+- "Recharge X API"
+- "Recharge Gemini API"
+
+(Open respective dashboards)
+
+----------------------------------------
+
+4. FEEDBACK ANALYTICS
+
+- Avg rating
+- Common tags
+- Recent feedback
+
+----------------------------------------
+
+5. USER BEHAVIOR ANALYSIS
+
+- High token users
+- Most active users
+- Drop-off users
+
+----------------------------------------
+PART 7: REPEAT POST FEATURE (X PLATFORM)
+
+In Post Creator:
+
+Option:
+"Repeat Post"
+
+Allow:
+- Every X minutes
+- Every X hours
+- Every X days
+
+Store:
+
+RepeatConfig {
+  interval,
+  type: minute/hour/day
+}
+
+Use scheduler/cron job
+
+Ensure:
+- Token deducted per post execution
+
+----------------------------------------
+PART 8: LINKEDIN JOB + LEAD OUTREACH
+
+Flow:
+
+1. User creates job post
+
+2. System:
+- Generates job content (tokens used)
+- Finds relevant leads (based on role/keywords)
+
+3. Outreach:
+- Send job message to leads
+
+4. Token deduction:
+
+- Job generation → 15 tokens
+- Lead outreach (batch) → 10 tokens
+
+----------------------------------------
+
+IMPORTANT:
+- Do NOT spam users (limit outreach)
+- Add daily cap
+
+----------------------------------------
+PART 9: BUY TOKENS (PAYMENT)
+
+- Razorpay integration
+
+Options:
+- 200 → ₹199
+- 500 → ₹399
+- 1000 → ₹699
+
+On success:
+- Update tokensAvailable
+
+----------------------------------------
+PART 10: SAFETY + LIMITS
+
+- Rate limit posting
+- Prevent abuse
+- Retry logic for failed posts
+- Clear error messages
+
+----------------------------------------
+
+FINAL GOAL:
+
+Build a production-grade SaaS system where:
+- Tokens control usage
+- Costs are managed
+- UX is simple
+- Monetization is strong
+
+Do NOT build demo-level features.
+Build scalable, real-world system.

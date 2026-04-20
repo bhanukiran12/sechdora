@@ -1,11 +1,30 @@
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap } from "lucide-react";
+import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins } from "lucide-react";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SchedoraLogo from "@/components/SchedoraLogo";
 
 const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
+
+function TokenBadge({ tokens }) {
+  const postsLeft = Math.floor((tokens ?? 0) / 3);
+  return (
+    <div
+      className="relative group"
+      title={`${tokens ?? 0} credits remaining (~${postsLeft} standard posts)`}
+    >
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-yellow-400 bg-gradient-to-r from-yellow-50 to-amber-50 shadow-sm cursor-default select-none">
+        <span className="text-lg leading-none" role="img" aria-label="credits">🪙</span>
+        <span className="font-black text-sm text-yellow-700">{tokens ?? 0}</span>
+      </div>
+      <div className="absolute bottom-full left-0 mb-2 w-52 bg-black text-white text-xs font-bold rounded-xl px-3 py-2 shadow-brutal pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+        {tokens ?? 0} credits remaining<br />
+        <span className="font-normal text-white/70">~{postsLeft} standard posts left</span>
+      </div>
+    </div>
+  );
+}
 
 export default function Sidebar({ active }) {
   const navigate = useNavigate();
@@ -32,6 +51,7 @@ export default function Sidebar({ active }) {
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
     { id: 'jobs', label: 'Job Posts', icon: Briefcase, path: '/jobs' },
     { id: 'accounts', label: 'Accounts', icon: Settings, path: '/settings/accounts' },
+    { id: 'tokens', label: 'Credits', icon: Coins, path: '/tokens' },
     { id: 'pricing', label: 'Pricing', icon: Zap, path: '/pricing' },
   ];
 
@@ -56,8 +76,8 @@ export default function Sidebar({ active }) {
 
   const sidebarContent = (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="mb-10 flex items-center justify-between">
-        <motion.div 
+      <div className="mb-6 flex items-center justify-between">
+        <motion.div
           initial={{ rotate: -4, y: -4, scale: 0.96 }}
           animate={{ rotate: 0, y: 0, scale: 1 }}
           whileHover={{ rotate: -1, y: -1 }}
@@ -70,6 +90,12 @@ export default function Sidebar({ active }) {
           <X className="w-5 h-5" />
         </button>
       </div>
+
+      {user && (
+        <div className="mb-4">
+          <TokenBadge tokens={user.tokens} />
+        </div>
+      )}
 
       <nav className="flex-1 space-y-3 overflow-y-auto pr-1 pb-4">
         {menuItems.map((item, idx) => {
@@ -84,8 +110,8 @@ export default function Sidebar({ active }) {
               whileHover={{ x: 2 }}
               onClick={() => handleNav(item.path)}
               className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border-2 ${
-                isActive 
-                  ? 'bg-primary text-white border-black shadow-brutal translate-x-1' 
+                isActive
+                  ? 'bg-primary text-white border-black shadow-brutal translate-x-1'
                   : 'text-text-secondary border-transparent hover:border-black hover:bg-white hover:shadow-brutal-hover'
               }`}
               data-testid={`sidebar-${item.id}`}
@@ -98,6 +124,11 @@ export default function Sidebar({ active }) {
       </nav>
 
       <div className="mt-auto shrink-0 pt-4">
+        {user && (
+          <div className="mb-3 px-4 py-2 rounded-xl bg-white border-2 border-border text-xs font-bold text-text-muted truncate">
+            {user.name || user.email}
+          </div>
+        )}
         <button
           onClick={handleLogout}
           className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-text-muted hover:bg-red-50 hover:text-red-600 hover:border-red-600 border-2 border-transparent transition-all"
@@ -112,7 +143,6 @@ export default function Sidebar({ active }) {
 
   return (
     <>
-      {/* Mobile hamburger */}
       <motion.button
         whileTap={{ scale: 0.96 }}
         onClick={() => setMobileOpen(true)}
@@ -122,21 +152,19 @@ export default function Sidebar({ active }) {
         <Menu className="w-6 h-6" />
       </motion.button>
 
-      {/* Mobile overlay */}
       <AnimatePresence>
         {mobileOpen && (
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
-            className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40" 
-            onClick={() => setMobileOpen(false)} 
-            data-testid="sidebar-overlay" 
+            className="lg:hidden fixed inset-0 bg-black/60 backdrop-blur-sm z-40"
+            onClick={() => setMobileOpen(false)}
+            data-testid="sidebar-overlay"
           />
         )}
       </AnimatePresence>
 
-      {/* Mobile sidebar */}
       <aside
         className={`lg:hidden fixed top-0 left-0 h-screen w-72 border-r-4 border-black bg-surface p-6 z-50 transform transition-transform duration-300 ease-out shadow-brutal-lg ${
           mobileOpen ? 'translate-x-0' : '-translate-x-full'
@@ -146,7 +174,6 @@ export default function Sidebar({ active }) {
         {sidebarContent}
       </aside>
 
-      {/* Desktop sidebar */}
       <aside className="hidden lg:block w-72 h-screen border-r-4 border-black bg-surface p-8 flex-shrink-0 overflow-hidden sticky top-0" data-testid="sidebar">
         {sidebarContent}
       </aside>
