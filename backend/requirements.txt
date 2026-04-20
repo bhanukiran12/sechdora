@@ -90,7 +90,7 @@ python-dateutil==2.9.0.post0
 python-dotenv==1.2.2
 python-jose==3.5.0
 python-multipart==0.0.24
-razorpay==1.5.0
+razorpay==2.0.1
 pytokens==0.4.1
 PyYAML==6.0.3
 referencing==0.37.0
