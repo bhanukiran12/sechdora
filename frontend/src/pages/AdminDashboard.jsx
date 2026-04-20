@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import axios from 'axios';
 import {
   Users, BarChart3, MessageSquare, Settings, CheckCircle2,
@@ -44,7 +44,7 @@ export default function AdminDashboard() {
   const authToken = localStorage.getItem('access_token');
   const headers = { Authorization: `Bearer ${authToken}` };
 
-  const fetchData = async () => {
+  const fetchData = useCallback(async () => {
     setLoading(true);
     try {
       const [statsRes, usersRes, feedbackRes] = await Promise.all([
@@ -61,9 +61,9 @@ export default function AdminDashboard() {
     } finally {
       setLoading(false);
     }
-  };
+  }, [headers, navigate]);
 
-  useEffect(() => { fetchData(); }, []);
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   if (loading) {
     return (

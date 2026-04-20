@@ -74,7 +74,7 @@ export default function TokenDashboard() {
     } finally {
       setLoading(false);
     }
-  }, []);
+  }, [headers]);
 
   useEffect(() => { fetchData(); }, [fetchData]);
 
