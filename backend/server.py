@@ -123,7 +123,7 @@ def calculate_token_cost(content):
         "urls": detection["urls"]
     }
 
-def deduct_tokens(user, tokens):
+async def deduct_tokens(user, tokens):
     """Deduct tokens from user balance. Returns (success, message)."""
     if not user:
         return False, "User not found"
@@ -138,7 +138,7 @@ def deduct_tokens(user, tokens):
     )
     return True, "Tokens deducted"
 
-def log_token_usage(user, action, token_type, tokens):
+async def log_token_usage(user, action, token_type, tokens):
     """Log token usage for analytics."""
     await db.token_logs.insert_one({
         "user_id": user["_id"],
