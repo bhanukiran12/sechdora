@@ -28,7 +28,8 @@ export default function PricingPage() {
     const fetchData = async () => {
       try {
         const plansRes = await axios.get(`${API}/pricing/plans`);
-        setPlans(plansRes.data);
+        const plansData = plansRes.data;
+        setPlans(Array.isArray(plansData) ? plansData : []);
         if (token) {
           const planRes = await axios.get(`${API}/user/plan`, {
             headers: { Authorization: `Bearer ${token}` },
@@ -37,6 +38,7 @@ export default function PricingPage() {
         }
       } catch (err) {
         console.error(err);
+        setPlans([]);
       } finally {
         setLoading(false);
       }
@@ -141,7 +143,7 @@ export default function PricingPage() {
 
         {/* Plan Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-16">
-          {(plans || []).map((plan) => {
+          {Array.isArray(plans) && plans.length > 0 ? plans.map((plan) => {
             const meta = planMeta[plan.id] || planMeta.free;
             const Icon = meta.icon;
             const isCurrent = currentPlan?.planType === plan.id;
@@ -212,7 +214,7 @@ export default function PricingPage() {
                 </button>
               </div>
             );
-          })}
+          }) : null}
         </div>
 
         {/* Feature Comparison Table */}
@@ -225,7 +227,7 @@ export default function PricingPage() {
               <thead>
                 <tr className="border-b-4 border-black">
                   <th className="text-left p-4 font-black text-sm">Feature</th>
-                  {plans.map((p) => (
+                  {(plans || []).map((p) => (
                     <th key={p.id} className="p-4 font-black text-sm text-center">{p.name}</th>
                   ))}
                 </tr>
@@ -234,7 +236,7 @@ export default function PricingPage() {
                 {FEATURES.map((feat, i) => (
                   <tr key={feat.key} className={`border-b-2 border-black/10 ${i % 2 === 0 ? "" : "bg-surface"}`}>
                     <td className="p-4 font-bold text-sm">{feat.label}</td>
-                    {plans.map((p) => (
+                    {(plans || []).map((p) => (
                       <td key={p.id} className="p-4 text-center text-sm font-bold">
                         {feat.bool ? (
                           p[feat.key]
