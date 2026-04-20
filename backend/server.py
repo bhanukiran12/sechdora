@@ -27,6 +27,7 @@ from fastapi.responses import RedirectResponse
 import csv
 import io
 import resend
+import razorpay
 from bson import ObjectId
 
 
@@ -61,6 +62,29 @@ scheduler = AsyncIOScheduler()
 # JWT
 JWT_ALGORITHM = "HS256"
 JWT_SECRET = os.environ.get("JWT_SECRET", "schedora-fallback-secret-key-for-stability")
+
+# Razorpay
+RAZORPAY_KEY_ID = os.environ.get("RAZORPAY_KEY_ID", "")
+RAZORPAY_KEY_SECRET = os.environ.get("RAZORPAY_KEY_SECRET", "")
+
+# ─── Pricing Plans ───────────────────────────────────────────────────────────
+PLANS = {
+    "free": {
+        "name": "Free", "price": 0,
+        "maxAccounts": 1, "maxPostsPerMonth": 10,
+        "aiEnabled": False, "jobPosting": False, "jobExport": False, "prioritySupport": False,
+    },
+    "pro": {
+        "name": "Pro", "price": 999,
+        "maxAccounts": 5, "maxPostsPerMonth": 100,
+        "aiEnabled": True, "jobPosting": True, "jobExport": False, "prioritySupport": False,
+    },
+    "business": {
+        "name": "Business", "price": 2999,
+        "maxAccounts": 15, "maxPostsPerMonth": None,  # unlimited
+        "aiEnabled": True, "jobPosting": True, "jobExport": True, "prioritySupport": True,
+    },
+}
 
 # SMTP Config (Netlify/GoDaddy/ForwardEmail)
 SMTP_HOST = os.environ.get("SMTP_HOST", "smtpout.secureserver.net")
@@ -204,6 +228,43 @@ def normalize_media_urls(values: Any) -> List[str]:
         if url:
             normalized.append(url)
     return normalized[:10]
+
+
+# ─── Plan Helpers ─────────────────────────────────────────────────────────────
+def get_plan(user: dict) -> dict:
+    return PLANS.get(user.get("planType", "free"), PLANS["free"])
+
+async def enforce_account_limit(user: dict):
+    plan = get_plan(user)
+    connected = await db.social_accounts.count_documents({"user_id": user["_id"], "status": "connected"})
+    if connected >= plan["maxAccounts"]:
+        raise HTTPException(status_code=403, detail={
+            "code": "account_limit_reached",
+            "message": f"Account limit reached ({connected}/{plan['maxAccounts']}). Upgrade your plan to connect more accounts.",
+            "upgrade": True,
+        })
+
+async def enforce_post_limit(user: dict):
+    plan = get_plan(user)
+    if plan["maxPostsPerMonth"] is None:
+        return  # unlimited
+    posts_used = user.get("postsUsedThisMonth", 0)
+    if posts_used >= plan["maxPostsPerMonth"]:
+        raise HTTPException(status_code=403, detail={
+            "code": "post_limit_reached",
+            "message": f"You've reached your monthly post limit ({posts_used}/{plan['maxPostsPerMonth']}). Upgrade to unlock unlimited posting.",
+            "upgrade": True,
+        })
+
+def enforce_feature(user: dict, feature: str):
+    plan = get_plan(user)
+    if not plan.get(feature, False):
+        feature_names = {"aiEnabled": "AI content generation", "jobPosting": "Job Posts", "jobExport": "Job Post export", "prioritySupport": "Priority support"}
+        raise HTTPException(status_code=403, detail={
+            "code": "feature_locked",
+            "message": f"Upgrade your plan to access {feature_names.get(feature, feature)}.",
+            "upgrade": True,
+        })
 
 
 def build_email_brand_header() -> str:
@@ -503,6 +564,8 @@ async def register(user_data: UserRegister):
     user_doc = {
         "email": email, "password_hash": hash_password(user_data.password),
         "name": user_data.name, "role": "user", "status": "unverified",
+        "planType": "free", "postsUsedThisMonth": 0,
+        "subscriptionStatus": "inactive", "planExpiryDate": None,
         "settings": {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True},
         "created_at": datetime.now(timezone.utc).isoformat()
     }
@@ -934,6 +997,7 @@ async def get_social_accounts(user: dict = Depends(get_current_user)):
 
 @api_router.post("/social-accounts")
 async def connect_social_account(account: SocialAccountConnect, user: dict = Depends(get_current_user)):
+    await enforce_account_limit(user)
     account_id = f"acc_{uuid.uuid4().hex[:12]}"
     doc = {"account_id": account_id, "user_id": user["_id"], "platform": account.platform, "platform_user_id": account.platform_user_id, "username": account.username, "access_token": account.access_token, "refresh_token": account.refresh_token, "status": "connected", "connected_at": datetime.now(timezone.utc).isoformat()}
     await db.social_accounts.insert_one(doc)
@@ -973,6 +1037,7 @@ async def download_media(path: str, authorization: str = Header(None), auth: str
 # ========== POSTS WITH RECURRING ==========
 @api_router.post("/posts")
 async def create_post(post_data: PostCreate, user: dict = Depends(get_current_user)):
+    await enforce_post_limit(user)
     post_id = f"post_{uuid.uuid4().hex[:12]}"
     status = post_data.status or "draft"
     if post_data.scheduled_time:
@@ -990,6 +1055,7 @@ async def create_post(post_data: PostCreate, user: dict = Depends(get_current_us
         "published_at": None, "logs": []
     }
     await db.posts.insert_one(post_doc)
+    await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$inc": {"postsUsedThisMonth": 1}})
     await log_audit(user["_id"], "post.created", "post", post_id, {"platforms": post_data.platforms, "status": status, "recurrence": post_data.recurrence})
 
     if status == "scheduled" and post_data.scheduled_time and review_status == "approved":
@@ -2005,6 +2071,140 @@ async def startup():
 async def shutdown():
     client.close()
     scheduler.shutdown()
+
+
+# ─── Pricing & Payment Endpoints ─────────────────────────────────────────────
+
+@api_router.get("/pricing/plans")
+async def get_pricing_plans():
+    plans_out = []
+    for key, plan in PLANS.items():
+        plans_out.append({
+            "id": key, **plan,
+            "maxPostsPerMonth": plan["maxPostsPerMonth"] if plan["maxPostsPerMonth"] is not None else "unlimited"
+        })
+    return plans_out
+
+@api_router.get("/user/plan")
+async def get_user_plan(user: dict = Depends(get_current_user)):
+    plan = get_plan(user)
+    connected = await db.social_accounts.count_documents({"user_id": user["_id"], "status": "connected"})
+    return {
+        "planType": user.get("planType", "free"),
+        "plan": {**plan, "maxPostsPerMonth": plan["maxPostsPerMonth"] if plan["maxPostsPerMonth"] is not None else "unlimited"},
+        "postsUsedThisMonth": user.get("postsUsedThisMonth", 0),
+        "connectedAccountsCount": connected,
+        "subscriptionStatus": user.get("subscriptionStatus", "inactive"),
+        "planExpiryDate": user.get("planExpiryDate"),
+    }
+
+class CreateOrderRequest(BaseModel):
+    plan: str
+
+@api_router.post("/create-order")
+async def create_razorpay_order(data: CreateOrderRequest, user: dict = Depends(get_current_user)):
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=503, detail="Payment service not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.")
+    if data.plan not in ["pro", "business"]:
+        raise HTTPException(status_code=400, detail="Invalid plan selected")
+    plan = PLANS[data.plan]
+    client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+    order = client_rz.order.create({
+        "amount": plan["price"] * 100,
+        "currency": "INR",
+        "receipt": f"order_{str(user['_id'])[:8]}_{data.plan}",
+        "notes": {"user_id": str(user["_id"]), "plan": data.plan},
+    })
+    return {"order_id": order["id"], "amount": order["amount"], "currency": order["currency"], "key": RAZORPAY_KEY_ID}
+
+class VerifyPaymentRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    plan: str
+
+@api_router.post("/verify-payment")
+async def verify_payment(data: VerifyPaymentRequest, user: dict = Depends(get_current_user)):
+    if not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=503, detail="Payment service not configured")
+    if data.plan not in ["pro", "business"]:
+        raise HTTPException(status_code=400, detail="Invalid plan")
+    try:
+        client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        client_rz.utility.verify_payment_signature({
+            "razorpay_order_id": data.razorpay_order_id,
+            "razorpay_payment_id": data.razorpay_payment_id,
+            "razorpay_signature": data.razorpay_signature,
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="Payment verification failed. Please contact support.")
+    expiry = datetime.now(timezone.utc) + timedelta(days=30)
+    await db.users.update_one(
+        {"_id": ObjectId(user["_id"])},
+        {"$set": {"planType": data.plan, "subscriptionStatus": "active", "planExpiryDate": expiry.isoformat(), "postsUsedThisMonth": 0}}
+    )
+    await db.payments.insert_one({
+        "user_id": user["_id"], "plan": data.plan, "amount": PLANS[data.plan]["price"],
+        "razorpay_order_id": data.razorpay_order_id, "razorpay_payment_id": data.razorpay_payment_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    logger.info(f"Payment verified for user {user['_id']}: upgraded to {data.plan}")
+    return {"success": True, "plan": data.plan, "message": f"Successfully upgraded to {PLANS[data.plan]['name']} plan!"}
+
+
+# ─── Job Posts Endpoints ──────────────────────────────────────────────────────
+
+class JobPostCreate(BaseModel):
+    title: str
+    company: str
+    location: Optional[str] = ""
+    description: Optional[str] = ""
+    requirements: Optional[List[str]] = []
+    salary: Optional[str] = ""
+    job_type: Optional[str] = "Full-time"
+
+@api_router.get("/job-posts")
+async def list_job_posts(user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobPosting")
+    posts = await db.job_posts.find({"user_id": user["_id"]}, {"_id": 0}).to_list(100)
+    return posts
+
+@api_router.post("/job-posts")
+async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobPosting")
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    content = f"{job.title} at {job.company}\n\n{job.description}"
+    if get_plan(user)["aiEnabled"] and GEMINI_API_KEY:
+        try:
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            prompt = (f"Write a compelling social media job post for: {job.title} at {job.company}. "
+                      f"Location: {job.location or 'Remote'}. Type: {job.job_type}. "
+                      f"Salary: {job.salary or 'Competitive'}. "
+                      f"Requirements: {', '.join(job.requirements) if job.requirements else job.description}. "
+                      f"Keep it concise, engaging and under 280 words.")
+            response = model.generate_content(prompt)
+            content = response.text
+        except Exception as e:
+            logger.error(f"AI job content error: {e}")
+    doc = {
+        "job_id": job_id, "user_id": user["_id"],
+        "title": job.title, "company": job.company, "location": job.location,
+        "description": job.description, "requirements": job.requirements,
+        "salary": job.salary, "job_type": job.job_type,
+        "generated_content": content, "can_export": get_plan(user)["jobExport"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.job_posts.insert_one(doc)
+    doc.pop("_id", None)
+    return doc
+
+@api_router.delete("/job-posts/{job_id}")
+async def delete_job_post(job_id: str, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobPosting")
+    result = await db.job_posts.delete_one({"job_id": job_id, "user_id": user["_id"]})
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Job post not found")
+    return {"message": "Job post deleted"}
 
 
 @app.get("/health")

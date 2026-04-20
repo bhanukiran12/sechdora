@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X } from "lucide-react";
+import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap } from "lucide-react";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -30,7 +30,9 @@ export default function Sidebar({ active }) {
     { id: 'schedule', label: 'Calendar', icon: Calendar, path: '/posts/schedule' },
     { id: 'bulk', label: 'Bulk Upload', icon: Upload, path: '/posts/bulk-upload' },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
-    { id: 'accounts', label: 'Accounts', icon: Settings, path: '/settings/accounts' }
+    { id: 'jobs', label: 'Job Posts', icon: Briefcase, path: '/jobs' },
+    { id: 'accounts', label: 'Accounts', icon: Settings, path: '/settings/accounts' },
+    { id: 'pricing', label: 'Pricing', icon: Zap, path: '/pricing' },
   ];
 
   if (user?.role === 'admin' || user?.role === 'owner') {

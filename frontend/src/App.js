@@ -21,6 +21,8 @@ import BulkUpload from "@/pages/BulkUpload";
 import Onboarding from "@/pages/Onboarding";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
+import PricingPage from "@/pages/PricingPage";
+import JobPosts from "@/pages/JobPosts";
 import FeedbackModal from "@/components/FeedbackModal";
 import { MessageSquare } from "lucide-react";
 
@@ -103,6 +105,8 @@ function AppRouter() {
       <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />
       <Route path="/settings/accounts" element={<ProtectedRoute><ConnectedAccounts /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminDashboard /></ProtectedRoute>} />
+      <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/jobs" element={<ProtectedRoute><JobPosts /></ProtectedRoute>} />
     </Routes>
   );
 }

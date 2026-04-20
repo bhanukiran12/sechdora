@@ -1,7 +1,7 @@
 # Schedora - Social Media Management Platform
 
 ## Overview
-Schedora is a social media management and automation platform. Users can create, schedule, and automate posts across Instagram, Facebook, Twitter, LinkedIn, and YouTube. Key features include AI-driven content generation (Gemini), a drag-and-drop calendar, bulk CSV uploading, and an admin panel for team collaboration.
+Schedora is a social media management and automation platform. Users can create, schedule, and automate posts across Instagram, Facebook, Twitter, LinkedIn, and YouTube. Key features include AI-driven content generation (Gemini), a drag-and-drop calendar, bulk CSV uploading, an admin panel for team collaboration, a 3-tier subscription system with Razorpay payment integration, and a Job Posts module.
 
 ## Architecture
 
@@ -34,6 +34,24 @@ Schedora is a social media management and automation platform. Users can create,
 - `JWT_SECRET` — JWT signing secret
 - `SMTP_HOST`, `SMTP_PORT`, `SMTP_USER`, `SMTP_PASSWORD` — Email config
 - `RESEND_API_KEY` — Resend email API key
+- `RAZORPAY_KEY_ID` — Razorpay public key (payment integration)
+- `RAZORPAY_KEY_SECRET` — Razorpay secret key (payment integration)
+
+## Subscription / Pricing System
+Three tiers enforced on backend:
+- **Free**: 1 account, 10 posts/month, no AI, no job posts
+- **Pro** (₹999/mo): 5 accounts, 100 posts/month, AI, job posts (no export)
+- **Business** (₹2,999/mo): 15 accounts, unlimited posts, AI, job posts + export, priority support
+
+Enforcement helpers: `get_plan()`, `enforce_account_limit()`, `enforce_post_limit()`, `enforce_feature()`
+Payment flow: `POST /api/create-order` → Razorpay checkout → `POST /api/verify-payment`
+User fields: `planType`, `postsUsedThisMonth`, `subscriptionStatus`, `planExpiryDate`
+
+## Job Posts Module (Pro/Business only)
+- CRUD via `/api/job-posts` endpoints
+- AI-generated social media copy via Gemini (if `aiEnabled` on plan)
+- Export to `.txt` (Business only)
+- Frontend: `frontend/src/pages/JobPosts.jsx`
 
 ## Workflows
 - **Start application** — Frontend dev server on port 5000 (webview)
