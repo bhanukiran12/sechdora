@@ -1,0 +1,157 @@
+You are a senior SaaS full-stack engineer and UX designer.
+
+Context:
+We are building "Schedora" — an AI-powered social media scheduling and content automation platform.
+
+Implement a complete pricing system with plan limits, upgrade flow, and feature gating.
+
+----------------------------------------
+
+PART 1: PRICING PLANS
+
+Create 3 plans:
+
+1. FREE
+- maxAccounts: 1
+- maxPostsPerMonth: 10
+- aiEnabled: false
+- jobPosting: false
+- jobExport: false
+
+2. PRO (₹999/month)
+- maxAccounts: 5
+- maxPostsPerMonth: 100
+- aiEnabled: true
+- jobPosting: true
+- jobExport: false
+
+3. BUSINESS (₹2999/month)
+- maxAccounts: 15
+- maxPostsPerMonth: unlimited
+- aiEnabled: true
+- jobPosting: true
+- jobExport: true
+- prioritySupport: true
+
+----------------------------------------
+
+PART 2: DATABASE DESIGN
+
+Update User model:
+
+User {
+  name,
+  email,
+  planType: "free" | "pro" | "business",
+  postsUsedThisMonth: number,
+  connectedAccountsCount: number,
+  subscriptionStatus: "active" | "inactive",
+  planExpiryDate
+}
+
+----------------------------------------
+
+PART 3: FEATURE GATING (BACKEND)
+
+Before performing actions, enforce limits:
+
+1. Connecting account:
+IF connectedAccountsCount >= maxAccounts
+→ return error:
+"Account limit reached. Upgrade your plan."
+
+2. Scheduling post:
+IF postsUsedThisMonth >= maxPostsPerMonth
+→ block action + show upgrade message
+
+3. Job posting access:
+IF jobPosting = false
+→ return 403:
+"Upgrade to access job posting features"
+
+4. Job export:
+IF jobExport = false
+→ show upgrade modal
+
+----------------------------------------
+
+PART 4: FRONTEND UPGRADE UX
+
+Create:
+
+1. Pricing Page:
+- Show 3 plans
+- Highlight BUSINESS as "Most Powerful"
+- Show feature comparison table
+
+2. Upgrade Modal (triggered when limits hit):
+Message examples:
+- "You’ve reached your monthly post limit"
+- "Upgrade to unlock unlimited posting"
+- "Connect more accounts with Business plan"
+
+Buttons:
+- Upgrade Now
+- Cancel
+
+----------------------------------------
+
+PART 5: PAYMENT INTEGRATION
+
+Use Razorpay:
+
+Frontend:
+- Integrate Razorpay checkout
+- Pass selected plan
+
+Backend:
+- POST /api/create-order
+- POST /api/verify-payment
+
+On success:
+- Update user planType
+- Reset limits if needed
+- Set subscriptionStatus = active
+
+----------------------------------------
+
+PART 6: JOB POSTING MODULE (PLAN CONTROL)
+
+Create separate module:
+"Job Posts"
+
+Access:
+- Free → No access
+- Pro → Can generate job content only
+- Business → Full access (generate + export)
+
+----------------------------------------
+
+PART 7: SMART UPGRADE TRIGGERS
+
+Trigger upgrade prompts when:
+- User hits post limit
+- User tries to connect extra account
+- User tries to export job post
+
+----------------------------------------
+
+PART 8: UI REQUIREMENTS
+
+- Clean SaaS-style UI
+- Clear error messages (high contrast)
+- Toast notifications:
+  - Success
+  - Error
+  - Upgrade prompts
+
+----------------------------------------
+
+IMPORTANT:
+
+- Focus on clarity and usability
+- Do NOT overcomplicate UI
+- Ensure no silent failures
+- All limits must be enforced backend-side (not just frontend)
+
+This is a production SaaS feature, not a demo.
