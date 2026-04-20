@@ -85,15 +85,17 @@ app = FastAPI()
 
 # Move CORS to the top to ensure headers are added even on early crashes
 origins = [
-    os.environ.get('FRONTEND_URL', 'http://localhost:3000').rstrip("/"),
+    os.environ.get('FRONTEND_URL', 'http://localhost:5000').rstrip("/"),
     "https://schedora.in",
     "https://www.schedora.in",
     "https://sechdora.onrender.com",
-    "http://localhost:3000"
+    "http://localhost:3000",
+    "http://localhost:5000",
 ]
 app.add_middleware(
     CORSMiddleware,
     allow_origins=origins,
+    allow_origin_regex=r"https://.*\.replit\.dev",
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"]
@@ -264,38 +266,57 @@ def build_email_shell(title: str, intro: str, body_html: str, cta_label: Optiona
     </div>
     """
 # ========== EMAIL HELPER ==========
+RESEND_API_KEY = os.environ.get("RESEND_API_KEY")
+
 async def send_email(to: str, subject: str, html: str):
-    """Send email via SMTP (GoDaddy/Netlify)."""
-    if not SMTP_PASS:
-        logger.error("SMTP configuration missing: SMTP_PASSWORD is not set.")
-        return False
-    try:
-        message = EmailMessage()
-        message["From"] = f"Schedora <{SENDER_EMAIL}>"
-        message["To"] = to
-        message["Subject"] = subject
-        message["Reply-To"] = SENDER_EMAIL
-        message["X-Auto-Response-Suppress"] = "All"
-        message["Precedence"] = "bulk"
-        message["X-Priority"] = "1"
-        message["Importance"] = "high"
-        message.set_content("Your email client does not support HTML emails.")
-        message.add_alternative(html, subtype="html")
-        
-        await aiosmtplib.send(
-            message,
-            hostname=SMTP_HOST,
-            port=SMTP_PORT,
-            username=SMTP_USER,
-            password=SMTP_PASS,
-            use_tls=(SMTP_PORT == 465),
-            start_tls=(SMTP_PORT == 587)
-        )
-        logger.info(f"Email sent successfully to {to}")
-        return True
-    except Exception as e:
-        logger.error(f"SMTP send failed to {to}: {e}")
-        return False
+    """Send email via Resend API (preferred) or SMTP fallback."""
+    # Try Resend first if API key is available
+    if RESEND_API_KEY:
+        try:
+            resend.api_key = RESEND_API_KEY
+            params = {
+                "from": f"Schedora <onboarding@resend.dev>",
+                "to": [to],
+                "subject": subject,
+                "html": html,
+            }
+            resend.Emails.send(params)
+            logger.info(f"Email sent via Resend to {to}")
+            return True
+        except Exception as e:
+            logger.error(f"Resend send failed to {to}: {e}")
+            # Fall through to SMTP
+
+    # Try SMTP if configured
+    if SMTP_PASS:
+        try:
+            message = EmailMessage()
+            message["From"] = f"Schedora <{SENDER_EMAIL}>"
+            message["To"] = to
+            message["Subject"] = subject
+            message["Reply-To"] = SENDER_EMAIL
+            message["X-Auto-Response-Suppress"] = "All"
+            message["Precedence"] = "bulk"
+            message["X-Priority"] = "1"
+            message["Importance"] = "high"
+            message.set_content("Your email client does not support HTML emails.")
+            message.add_alternative(html, subtype="html")
+            await aiosmtplib.send(
+                message,
+                hostname=SMTP_HOST,
+                port=SMTP_PORT,
+                username=SMTP_USER,
+                password=SMTP_PASS,
+                use_tls=(SMTP_PORT == 465),
+                start_tls=(SMTP_PORT == 587)
+            )
+            logger.info(f"Email sent via SMTP to {to}")
+            return True
+        except Exception as e:
+            logger.error(f"SMTP send failed to {to}: {e}")
+
+    logger.error(f"No email service configured (set RESEND_API_KEY or SMTP_PASSWORD)")
+    return False
 
 async def send_otp_email(to: str, otp: str):
     subject = "Your Schedora verification code"
@@ -507,14 +528,20 @@ async def register(user_data: UserRegister):
 async def issue_otp(email: str, otp: str) -> tuple[bool, str]:
     sent = await send_otp_email(email, otp)
     if not sent:
-        log_msg = (
-            "SMTP configuration missing: set SMTP_PASSWORD or SMTP_PASS"
-            if not SMTP_PASS
-            else f"SMTP server connection failed for {SMTP_HOST}:{SMTP_PORT}"
-        )
+        # Dev fallback: log OTP to console so user can complete registration
+        if not SMTP_PASS and not RESEND_API_KEY:
+            logger.warning(
+                f"\n{'='*50}\n"
+                f"[DEV] No email service configured.\n"
+                f"OTP for {email}: {otp}\n"
+                f"Set RESEND_API_KEY or SMTP_PASSWORD to enable email delivery.\n"
+                f"{'='*50}"
+            )
+            return True, "OTP printed to backend console (no email service configured)"
+        log_msg = f"Email delivery failed. Check RESEND_API_KEY or SMTP credentials."
         logger.error(f"OTP SEND FAILURE: {log_msg}")
         return False, log_msg
-    return True, "Email queued successfully"
+    return True, "Verification email sent"
 
 
 @api_router.post("/auth/resend-otp")

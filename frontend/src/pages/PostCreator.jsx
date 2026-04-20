@@ -6,7 +6,7 @@ import { Upload, Sparkles, ArrowLeft, Image as ImageIcon, Eye, PenLine, ShieldCh
 import Sidebar from "@/components/Sidebar";
 import PostPreview from "@/components/PostPreview";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://sechdora.onrender.com";
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
 const API = `${BACKEND_URL}/api`;
 
 const PLATFORMS = [

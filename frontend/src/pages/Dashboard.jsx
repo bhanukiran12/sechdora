@@ -8,7 +8,7 @@ import FeedbackModal from "@/components/FeedbackModal";
 import SchedoraLogo from "@/components/SchedoraLogo";
 import { motion, AnimatePresence } from "framer-motion";
 
-const API = `${process.env.REACT_APP_BACKEND_URL || "https://sechdora.onrender.com"}/api`;
+const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
 
 import { 
   Tooltip, 

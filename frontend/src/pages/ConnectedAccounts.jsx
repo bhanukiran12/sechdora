@@ -8,7 +8,7 @@ import {
 } from "lucide-react";
 import { PLATFORMS } from "@/constants/platforms";
 
-const API = `${process.env.REACT_APP_BACKEND_URL || "https://sechdora.onrender.com"}/api`;
+const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
 
 export default function ConnectedAccounts() {
   const [accounts, setAccounts] = useState([]);

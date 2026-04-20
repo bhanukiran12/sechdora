@@ -9,7 +9,6 @@ packages = ["cargo", "libiconv", "rustc"]
 [userenv]
 
 [userenv.shared]
-REACT_APP_BACKEND_URL = "http://localhost:8000"
 PORT = "5000"
 
 [workflows]

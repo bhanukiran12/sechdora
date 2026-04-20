@@ -5,7 +5,7 @@ import "@/index.css";
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL || "https://sechdora.onrender.com";
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
 const API = `${BACKEND_URL}/api`;
 
 // Pages

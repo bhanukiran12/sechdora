@@ -4,7 +4,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { TrendingUp, Eye, Heart, MessageCircle } from "lucide-react";
 
-const API = `${process.env.REACT_APP_BACKEND_URL || "https://sechdora.onrender.com"}/api`;
+const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
 
 export default function Analytics() {
   const [analytics, setAnalytics] = useState(null);
