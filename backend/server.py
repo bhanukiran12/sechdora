@@ -2487,7 +2487,7 @@ async def seed_admin():
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
-        await db.users.insert_one({"_id": ObjectId(), "email": admin_email, "password_hash": hash_password(admin_password), "name": "Admin", "role": "admin", "team_id": None, "onboarding_completed": True, "creator_type": "business", "preferred_platforms": ["instagram", "linkedin", "twitter"], "settings": {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True}, "created_at": datetime.now(timezone.utc).isoformat()})
+        await db.users.insert_one({"_id": ObjectId(), "email": admin_email, "password_hash": hash_password(admin_password), "name": "Admin", "role": "admin", "team_id": None, "onboarding_completed": True, "creator_type": "business", "planType": "business", "subscriptionStatus": "active", "preferred_platforms": ["instagram", "linkedin", "twitter"], "settings": {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True}, "created_at": datetime.now(timezone.utc).isoformat()})
         logger.info(f"Admin user created: {admin_email}")
     else:
         update = {}
@@ -2499,6 +2499,10 @@ async def seed_admin():
             update["onboarding_completed"] = True
         if "settings" not in existing:
             update["settings"] = {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True}
+        if "planType" not in existing:
+            update["planType"] = "business"
+        if "subscriptionStatus" not in existing:
+            update["subscriptionStatus"] = "active"
         if update:
             await db.users.update_one({"email": admin_email}, {"$set": update})
 

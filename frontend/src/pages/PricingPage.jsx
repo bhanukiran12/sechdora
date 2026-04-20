@@ -5,7 +5,8 @@ import { toast } from "sonner";
 import { Check, X, Zap, Crown, Star } from "lucide-react";
 import SchedoraLogo from "@/components/SchedoraLogo";
 
-const API = "/api";
+const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
+const API = `${BACKEND_URL}/api`;
 
 const DEFAULT_PLANS = [
   { id: "free", name: "Free", price: 0, maxAccounts: 1, maxPostsPerMonth: 10, aiEnabled: false, jobPosting: false, jobExport: false, prioritySupport: false },
@@ -146,7 +147,7 @@ export default function PricingPage() {
           )}
         </div>
 
-        {/* Plan Cards */}
+        
         <div className="grid md:grid-cols-3 gap-6 mb-16">
           {Array.isArray(plans) && plans.length > 0 ? plans.map((plan) => {
             const meta = planMeta[plan.id] || planMeta.free;
