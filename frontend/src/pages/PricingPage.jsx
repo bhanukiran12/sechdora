@@ -141,7 +141,7 @@ export default function PricingPage() {
 
         {/* Plan Cards */}
         <div className="grid md:grid-cols-3 gap-6 mb-16">
-          {plans.map((plan) => {
+          {(plans || []).map((plan) => {
             const meta = planMeta[plan.id] || planMeta.free;
             const Icon = meta.icon;
             const isCurrent = currentPlan?.planType === plan.id;
