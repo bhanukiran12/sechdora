@@ -10,7 +10,7 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      MONGO_URL: ${MONGO_URL}
+      MONGO_URL: ${MONGO_URL:-}
       DB_NAME: schedora
       JWT_SECRET: ${JWT_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
