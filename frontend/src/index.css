@@ -122,3 +122,14 @@ code {
     transition-duration: 0.01ms !important;
   }
 }
+
+/* Schedora coin spin animation */
+@keyframes schedora-coin-flip {
+  0% { transform: rotateY(0deg); }
+  100% { transform: rotateY(360deg); }
+}
+.schedora-coin-spin {
+  animation: schedora-coin-flip 3s ease-in-out infinite;
+  transform-style: preserve-3d;
+}
+
