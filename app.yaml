@@ -9,16 +9,16 @@ databases:
     num_nodes: 1
 
 services:
-  - name: schedora
-    dockerfile_path: Dockerfile
+  - name: backend
+    dockerfile_path: Dockerfile.backend
     instance_count: 1
     instance_size_slug: basic-xxs
-    http_port: 80
-    routes:
-      - path: /
+    http_port: 8080
     health_check:
       http_path: /health
     env:
+      - key: PORT
+        value: 8080
       - key: PYTHONUNBUFFERED
         value: "1"
       - key: MONGO_URL
@@ -33,6 +33,8 @@ services:
         value: ${RESEND_API_KEY}
       - key: SENDER_EMAIL
         value: ${SENDER_EMAIL}
+      - key: FRONTEND_URL
+        value: ${FRONTEND_URL}
       - key: RAZORPAY_KEY_ID
         value: ${RAZORPAY_KEY_ID}
       - key: RAZORPAY_KEY_SECRET
@@ -67,3 +69,11 @@ services:
         value: ${YOUTUBE_CLIENT_SECRET}
       - key: YOUTUBE_REDIRECT_URI
         value: ${YOUTUBE_REDIRECT_URI}
+
+  - name: frontend
+    dockerfile_path: Dockerfile.frontend
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 80
+    routes:
+      - path: /
