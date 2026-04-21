@@ -2545,19 +2545,19 @@ async def seed_admin():
         if update:
             await db.users.update_one({"email": admin_email}, {"$set": update})
 
- async def create_indexes():
-     await db.users.create_index("email", unique=True)
-     await db.login_attempts.create_index("identifier")
-     await db.posts.create_index("user_id")
-     await db.posts.create_index("status")
-     await db.job_posts.create_index("user_id")
-     await db.job_posts.create_index("job_id")
-     await db.job_lead_outreach.create_index("user_id")
-     await db.job_lead_outreach.create_index("createdAt")
-     await db.analytics.create_index("user_id")
-     await db.notifications.create_index("user_id")
-     await db.oauth_states.create_index("expires_at", expireAfterSeconds=0)
-     logger.info("Database indexes created")
+async def create_indexes():
+    await db.users.create_index("email", unique=True)
+    await db.login_attempts.create_index("identifier")
+    await db.posts.create_index("user_id")
+    await db.posts.create_index("status")
+    await db.job_posts.create_index("user_id")
+    await db.job_posts.create_index("job_id")
+    await db.job_lead_outreach.create_index("user_id")
+    await db.job_lead_outreach.create_index("createdAt")
+    await db.analytics.create_index("user_id")
+    await db.notifications.create_index("user_id")
+    await db.oauth_states.create_index("expires_at", expireAfterSeconds=0)
+    logger.info("Database indexes created")
 
 def generate_pkce_pair():
     """Generate PKCE code_verifier and code_challenge."""
@@ -2746,9 +2746,9 @@ async def export_job_post(job_id: str, user: dict = Depends(get_current_user)):
 async def delete_job_post(job_id: str, user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobPosting")
     result = await db.job_posts.delete_one({"job_id": job_id, "user_id": user["_id"]})
-     if result.deleted_count == 0:
-         raise HTTPException(status_code=404, detail="Job post not found")
-     return {"message": "Job post deleted"}
+    if result.deleted_count == 0:
+        raise HTTPException(status_code=404, detail="Job post not found")
+    return {"message": "Job post deleted"}
 
 
 # ─── Job Lead Outreach ────────────────────────────────────────────────────────

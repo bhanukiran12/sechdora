@@ -1,0 +1,280 @@
+You are a senior full-stack SaaS architect, product designer, growth strategist, and monetization expert.
+
+Product: Schedora — AI-powered social media growth + job automation platform.
+
+Goal:
+Transform the product into a high-growth, revenue-generating SaaS focused on:
+- Audience growth
+- Engagement
+- Lead generation
+- Monetization via tokens
+
+----------------------------------------
+PART 1: CORE TOKEN SYSTEM (5x PROFIT SAFE)
+
+Define:
+1 token = ₹1 value
+
+Costs:
+
+- AI Caption → 1 token
+- Viral Optimizer → 2 tokens
+- Hook Generator → 2 tokens
+- Standard Post → 3 tokens
+- URL Post → 20 tokens
+- Thread Generator → 5 tokens
+- Job Generation → 15 tokens
+- Job Export → 10 tokens
+- Lead Outreach → 10 tokens
+
+Rules:
+- Deduct tokens before action
+- Block if insufficient
+- Log all usage
+
+----------------------------------------
+PART 2: PLANS (SALES OPTIMIZED)
+
+FREE:
+- 1 account
+- 10 posts
+- No tokens
+
+PRO (₹999):
+- 5 accounts
+- 100 posts
+- 250 tokens
+- AI tools (hooks, captions)
+
+BUSINESS (₹2999):
+- 15 accounts
+- Unlimited posts
+- 1000 tokens
+- Twitter access
+- Job + lead system
+- Advanced growth tools
+
+----------------------------------------
+PART 3: VIRAL GROWTH FEATURES (HIGH IMPACT)
+
+1. VIRAL POST OPTIMIZER
+
+- Analyze post before publishing
+- Score: "Viral Score: X/100"
+- Suggestions:
+  - Improve hook
+  - Add curiosity
+  - Add CTA
+  - Hashtag suggestions
+
+----------------------------------------
+
+2. HOOK GENERATOR
+
+Input: topic
+
+Output:
+- 5 viral hooks
+
+----------------------------------------
+
+3. LINK → VIRAL POST CONVERTER
+
+Input: URL
+
+Output:
+- Story-based post
+- Curiosity hook
+- CTA without link
+
+----------------------------------------
+
+4. THREAD / CAROUSEL GENERATOR
+
+- Convert idea → multi-post thread (X)
+- Convert idea → LinkedIn carousel text
+
+----------------------------------------
+
+5. BEST TIME TO POST
+
+- Analyze user data
+- Suggest best time
+
+----------------------------------------
+
+6. CONTENT CALENDAR
+
+- Weekly suggestions
+- Content ideas
+
+----------------------------------------
+
+7. COMMENT ASSIST
+
+- Suggest replies for comments
+- Do NOT auto-comment
+
+----------------------------------------
+
+----------------------------------------
+PART 4: BULK JOB + CONTENT SYSTEM
+
+1. Bulk Job Posting:
+- Manual editor (multiple entries)
+- CSV upload
+- AI generation per job
+
+2. Token usage:
+- Job generation → 15 tokens
+
+----------------------------------------
+
+PART 5: LINKEDIN JOB → LEAD FUNNEL
+
+Flow:
+
+- Create job
+- Add CTA: “DM to apply”
+- Track responses
+- Suggest replies
+
+----------------------------------------
+
+PART 6: TWITTER ADVANCED SCHEDULING
+
+- Repeat post:
+  - Every X seconds/minutes/hours
+  - N times
+
+Example:
+- Every 30 sec, 10 times
+
+Constraints:
+- Min interval: 30 seconds
+- Max repeats: 20
+
+- Deduct tokens per execution
+
+----------------------------------------
+
+PART 7: URL DETECTION + WARNING
+
+Detect URLs:
+
+If found:
+- Show warning:
+  "This post will use 20 credits"
+
+Options:
+- Post anyway
+- Optimize post (remove link)
+
+----------------------------------------
+
+PART 8: TOKEN DASHBOARD (UX OPTIMIZED)
+
+Show:
+
+- Tokens remaining
+- "~36 posts left"
+
+- Usage summary:
+  posts created
+  jobs created
+
+- Smart insights:
+  "You used many link posts (high cost)"
+
+----------------------------------------
+
+PART 9: FEEDBACK SYSTEM
+
+After first post:
+
+Popup:
+
+- Rating (1–5)
+- Tags:
+  Easy / Confusing / Fast / Improve
+- Text input
+
+Store feedback
+
+----------------------------------------
+
+PART 10: ADMIN PANEL (BUSINESS CONTROL)
+
+Sections:
+
+1. Metrics:
+- Users
+- Posts
+- Tokens used
+
+2. Cost tracking:
+- X API cost
+- Gemini cost
+- Revenue vs cost
+
+3. Feedback analysis
+
+4. API recharge links
+
+----------------------------------------
+
+PART 11: DEPLOYMENT (DIGITALOCEAN)
+
+- Node backend (PM2)
+- React frontend (Nginx)
+- HTTPS (Let's Encrypt)
+
+----------------------------------------
+
+PART 12: UI SYSTEM
+
+- Clean SaaS UI
+- Token icon = coin style
+- Fix:
+  - poor contrast
+  - unclear icons
+  - empty states
+
+----------------------------------------
+
+PART 13: SALES OPTIMIZATION
+
+- Highlight BUSINESS plan
+- Add:
+  "Best for agencies"
+
+- Token packs:
+  200 → ₹199
+  500 → ₹399
+  1000 → ₹699
+
+- Upsell triggers:
+  - low tokens
+  - feature lock
+
+----------------------------------------
+
+PART 14: SAFETY
+
+- Rate limit actions
+- Prevent spam
+- Handle retries
+
+----------------------------------------
+
+FINAL GOAL:
+
+Build a scalable SaaS where:
+- Users grow their audience
+- Generate leads
+- Platform earns via tokens
+- UX is simple
+- Monetization is strong
+
+Do NOT build basic features.
+Build growth-driven system.
