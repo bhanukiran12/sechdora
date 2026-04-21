@@ -1,7 +1,7 @@
 import { useState, useEffect } from "react";
 import axios from "axios";
 
-const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
+const API = `/api`;
 
 let cachedPlan = null;
 let cacheTime = 0;
