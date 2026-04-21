@@ -1,27 +1,6 @@
-# Usage: adjust 'deploy:' section only
+# Production docker-compose - uses MongoDB Atlas
+# Set MONGO_URL in .env
 services:
-  mongodb:
-    image: mongo:6
-    container_name: schedora_mongodb
-    restart: unless-stopped
-    volumes:
-      - mongodb_data:/data/db
-    environment:
-      MONGO_INITDB_ROOT_USERNAME: admin
-      MONGO_INITDB_ROOT_PASSWORD: ${MONGO_ROOT_PASSWORD}
-    networks:
-      - schedora_network
-    healthcheck:
-      test:
-        [
-          "CMD-SHELL",
-          "test \"$(mongosh --quiet --username admin --password \"$${MONGO_INITDB_ROOT_PASSWORD}\" --authenticationDatabase admin --eval \"db.adminCommand({ ping: 1 }).ok\")\" = \"1\"",
-        ]
-      interval: 10s
-      timeout: 5s
-      retries: 10
-      start_period: 20s
-
   backend:
     build:
       context: .
@@ -31,13 +10,15 @@ services:
     ports:
       - "${BACKEND_PORT:-8000}:8000"
     environment:
-      MONGO_URL: mongodb://admin:${MONGO_ROOT_PASSWORD}@mongodb:27017/?authSource=admin
+      MONGO_URL: ${MONGO_URL}
       DB_NAME: schedora
       JWT_SECRET: ${JWT_SECRET}
       GEMINI_API_KEY: ${GEMINI_API_KEY}
       RESEND_API_KEY: ${RESEND_API_KEY}
       SENDER_EMAIL: ${SENDER_EMAIL}
       FRONTEND_URL: ${FRONTEND_URL}
+      RAZORPAY_KEY_ID: ${RAZORPAY_KEY_ID}
+      RAZORPAY_KEY_SECRET: ${RAZORPAY_KEY_SECRET}
       INSTAGRAM_CLIENT_ID: ${INSTAGRAM_CLIENT_ID}
       INSTAGRAM_CLIENT_SECRET: ${INSTAGRAM_CLIENT_SECRET}
       INSTAGRAM_REDIRECT_URI: ${INSTAGRAM_REDIRECT_URI}
@@ -53,11 +34,6 @@ services:
       YOUTUBE_CLIENT_ID: ${YOUTUBE_CLIENT_ID}
       YOUTUBE_CLIENT_SECRET: ${YOUTUBE_CLIENT_SECRET}
       YOUTUBE_REDIRECT_URI: ${YOUTUBE_REDIRECT_URI}
-    depends_on:
-      mongodb:
-        condition: service_healthy
-    networks:
-      - schedora_network
     healthcheck:
       test: ["CMD", "curl", "-f", "http://localhost:8000/health"]
       interval: 30s
@@ -69,9 +45,6 @@ services:
         limits:
           cpus: '1.0'
           memory: 1G
-        reservations:
-          cpus: '0.5'
-          memory: 512M
 
   frontend:
     build:
@@ -85,21 +58,13 @@ services:
       - "${FRONTEND_PORT:-80}:80"
     depends_on:
       backend:
-        condition: service_healthy
-    networks:
-      - schedora_network
+        condition: service_started
     deploy:
       resources:
         limits:
           cpus: '0.5'
           memory: 256M
-        reservations:
-          cpus: '0.25'
-          memory: 128M
-
-volumes:
-  mongodb_data:
 
 networks:
-  schedora_network:
+  default:
     driver: bridge
