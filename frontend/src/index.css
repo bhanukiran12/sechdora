@@ -133,3 +133,27 @@ code {
   transform-style: preserve-3d;
 }
 
+/* Coin glow effect */
+.schedora-coin-glow {
+  filter: drop-shadow(0 0 8px rgba(255, 77, 216, 0.8)) drop-shadow(0 0 16px rgba(125, 99, 255, 0.5));
+}
+
+/* Coin rainbow shimmer */
+@keyframes coin-shimmer {
+  0%, 100% { filter: hue-rotate(0deg) drop-shadow(0 0 4px #ff4fd8); }
+  33% { filter: hue-rotate(30deg) drop-shadow(0 0 6px #ff8a3d); }
+  66% { filter: hue-rotate(60deg) drop-shadow(0 0 8px #7d63ff); }
+}
+.schedora-coin-rainbow {
+  animation: coin-shimmer 2s ease-in-out infinite;
+}
+
+/* Coin bounce animation */
+@keyframes coin-bounce {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+.schedora-coin-bounce {
+  animation: coin-bounce 1s ease-in-out infinite;
+}
+

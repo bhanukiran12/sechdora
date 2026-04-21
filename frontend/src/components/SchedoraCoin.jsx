@@ -1,10 +1,16 @@
-export default function SchedoraCoin({ size = 24, className = "", animated = false }) {
+export default function SchedoraCoin({ size = 24, className = "", animated = false, glow = false, rainbow = false, bounce = false }) {
+  let extraClass = "";
+  if (animated) extraClass += " schedora-coin-spin";
+  if (glow) extraClass += " schedora-coin-glow";
+  if (rainbow) extraClass += " schedora-coin-rainbow";
+  if (bounce) extraClass += " schedora-coin-bounce";
+  
   return (
     <svg
       width={size}
       height={size}
       viewBox="0 0 64 64"
-      className={`${animated ? "schedora-coin-spin" : ""} ${className}`}
+      className={`${extraClass} ${className}`}
       aria-hidden="true"
       style={{ display: "inline-block", verticalAlign: "middle" }}
     >
