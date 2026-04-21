@@ -17,7 +17,7 @@ function TokenBadge({ tokens, isAdmin }) {
       title={isAdmin ? "Admin — unlimited Schedora coins" : `${tokens ?? 0} Schedora coins (~${postsLeft} standard posts)`}
     >
       <div className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-black bg-gradient-to-r from-fuchsia-50 via-orange-50 to-yellow-50 shadow-sm cursor-default select-none">
-        <SchedoraCoin size={20} />
+        <SchedoraCoin size={20} animated glow />
         <span className="font-black text-sm text-text-primary">{display}</span>
       </div>
       <div className="absolute bottom-full left-0 mb-2 w-56 bg-black text-white text-xs font-bold rounded-xl px-3 py-2 shadow-brutal pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
