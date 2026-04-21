@@ -1,20 +1,69 @@
 name: schedora
 region: nyc
-build:
-  docker_context: .
-  dockerfile: Dockerfile.backend
 
-http:
-  route: /
-  port: 8080
-  cors:
-    allow_origins:
-      - "*"
-    allow_methods:
-      - "*"
-    allow_headers:
-      - "*"
+databases:
+  - name: schedora-db
+    engine: MONGODB
+    version: "6"
+    size_slug: basic
+    num_nodes: 1
 
-env:
-  - key: PORT
-    value: 8080
+services:
+  - name: schedora
+    dockerfile_path: Dockerfile
+    instance_count: 1
+    instance_size_slug: basic-xxs
+    http_port: 80
+    routes:
+      - path: /
+    health_check:
+      http_path: /health
+    env:
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: MONGO_URL
+        value: ${MONGO_URL}
+      - key: DB_NAME
+        value: schedora
+      - key: JWT_SECRET
+        value: ${JWT_SECRET}
+      - key: GEMINI_API_KEY
+        value: ${GEMINI_API_KEY}
+      - key: RESEND_API_KEY
+        value: ${RESEND_API_KEY}
+      - key: SENDER_EMAIL
+        value: ${SENDER_EMAIL}
+      - key: RAZORPAY_KEY_ID
+        value: ${RAZORPAY_KEY_ID}
+      - key: RAZORPAY_KEY_SECRET
+        value: ${RAZORPAY_KEY_SECRET}
+      - key: INSTAGRAM_CLIENT_ID
+        value: ${INSTAGRAM_CLIENT_ID}
+      - key: INSTAGRAM_CLIENT_SECRET
+        value: ${INSTAGRAM_CLIENT_SECRET}
+      - key: INSTAGRAM_REDIRECT_URI
+        value: ${INSTAGRAM_REDIRECT_URI}
+      - key: FACEBOOK_CLIENT_ID
+        value: ${FACEBOOK_CLIENT_ID}
+      - key: FACEBOOK_CLIENT_SECRET
+        value: ${FACEBOOK_CLIENT_SECRET}
+      - key: FACEBOOK_REDIRECT_URI
+        value: ${FACEBOOK_REDIRECT_URI}
+      - key: TWITTER_CLIENT_ID
+        value: ${TWITTER_CLIENT_ID}
+      - key: TWITTER_CLIENT_SECRET
+        value: ${TWITTER_CLIENT_SECRET}
+      - key: TWITTER_REDIRECT_URI
+        value: ${TWITTER_REDIRECT_URI}
+      - key: LINKEDIN_CLIENT_ID
+        value: ${LINKEDIN_CLIENT_ID}
+      - key: LINKEDIN_CLIENT_SECRET
+        value: ${LINKEDIN_CLIENT_SECRET}
+      - key: LINKEDIN_REDIRECT_URI
+        value: ${LINKEDIN_REDIRECT_URI}
+      - key: YOUTUBE_CLIENT_ID
+        value: ${YOUTUBE_CLIENT_ID}
+      - key: YOUTUBE_CLIENT_SECRET
+        value: ${YOUTUBE_CLIENT_SECRET}
+      - key: YOUTUBE_REDIRECT_URI
+        value: ${YOUTUBE_REDIRECT_URI}
