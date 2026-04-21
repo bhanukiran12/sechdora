@@ -1,4 +1,4 @@
-export default function SchedoraCoin({ size = 24, className = "", animated = false, glow = false, rainbow = false, bounce = false }) {
+export default function SchedoraCoin({ size = 24, className = "", animated = false, glow = false, rainbow = false, bounce = false, whiteBg = false }) {
   let extraClass = "";
   if (animated) extraClass += " schedora-coin-spin";
   if (glow) extraClass += " schedora-coin-glow";
@@ -12,8 +12,10 @@ export default function SchedoraCoin({ size = 24, className = "", animated = fal
       viewBox="0 0 64 64"
       className={`${extraClass} ${className}`}
       aria-hidden="true"
-      style={{ display: "inline-block", verticalAlign: "middle" }}
+      style={{ display: "inline-block", verticalAlign: "middle", borderRadius: "50%" }}
     >
+      {whiteBg && <circle cx="32" cy="32" r="32" fill="white" />}
+      {whiteBg && <circle cx="32" cy="32" r="30" fill="white" stroke="#111111" strokeWidth="2" />}
       <defs>
         <radialGradient id="sch-coin-rim" cx="50%" cy="50%" r="50%">
           <stop offset="0%" stopColor="#ffd1f2" />
