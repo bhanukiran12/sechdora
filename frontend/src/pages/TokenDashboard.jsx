@@ -8,6 +8,7 @@ import {
   Clock, BarChart3, Lightbulb, CheckCircle2
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
+import SchedoraCoin from "@/components/SchedoraCoin";
 
 const API = `/api`;
 
@@ -130,7 +131,7 @@ export default function TokenDashboard() {
         <Sidebar active="tokens" />
         <main className="flex-1 flex items-center justify-center min-h-screen bg-background">
           <div className="text-center">
-            <span className="text-5xl animate-bounce block mb-3">🪙</span>
+            <SchedoraCoin size={56} animated className="block mb-3 mx-auto" />
             <p className="font-black text-lg uppercase tracking-widest">Loading credits...</p>
           </div>
         </main>
@@ -158,7 +159,7 @@ export default function TokenDashboard() {
           {/* Page Header */}
           <div>
             <h1 className="text-4xl md:text-5xl font-black font-heading tracking-tighter uppercase">
-              🪙 Credits
+              <SchedoraCoin size={40} className="inline-block mr-2 align-middle" /> Credits
             </h1>
             <p className="text-text-secondary font-bold mt-1">
               Track usage, buy more, stay unblocked.
@@ -176,7 +177,7 @@ export default function TokenDashboard() {
                 <div className="text-xs font-black uppercase tracking-widest text-yellow-700 mb-2">Credits Remaining</div>
                 <div className="text-7xl font-black text-black flex items-end gap-3">
                   <span>{stats?.balance ?? 0}</span>
-                  <span className="text-3xl mb-2 opacity-50">🪙</span>
+                  <SchedoraCoin size={36} className="mb-2 opacity-80" />
                 </div>
                 <div className="mt-2 text-base font-bold text-yellow-800">
                   ~{stats?.postsLeft ?? 0} standard posts left
@@ -257,7 +258,7 @@ export default function TokenDashboard() {
                   )}
                   <div className="text-xs font-black uppercase tracking-widest text-text-muted">{pack.label}</div>
                   <div className="text-4xl font-black">
-                    🪙 {pack.tokens}
+                    <SchedoraCoin size={32} className="inline-block align-middle mr-1" /> {pack.tokens}
                   </div>
                   <div className="text-sm text-text-secondary font-bold">
                     ~{Math.floor(pack.tokens / 3)} standard posts
@@ -344,7 +345,7 @@ export default function TokenDashboard() {
                       <span className="text-xs font-bold text-text-muted">{dateStr}</span>
                     </div>
                     <div className={`font-black text-sm ${isCredit ? "text-green-600" : "text-red-600"}`}>
-                      {isCredit ? "+" : "-"}{absTokens} 🪙
+                      {isCredit ? "+" : "-"}{absTokens} <SchedoraCoin size={14} className="inline-block align-middle" />
                     </div>
                   </motion.div>
                 );
@@ -370,7 +371,7 @@ export default function TokenDashboard() {
                   <span className="text-sm font-bold flex items-center gap-1.5">
                     <span>{icon}</span> {label}
                   </span>
-                  <span className="font-black text-sm">{cost} 🪙</span>
+                  <span className="font-black text-sm inline-flex items-center gap-1">{cost} <SchedoraCoin size={14} /></span>
                 </div>
               ))}
             </div>

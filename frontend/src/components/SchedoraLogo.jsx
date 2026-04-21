@@ -14,45 +14,43 @@ export default function SchedoraLogo({ size = "md", showWordmark = true, classNa
   return (
     <div className={`inline-flex items-center gap-3 ${className}`}>
       <div className={`relative shrink-0 ${iconSizes[size] || iconSizes.md}`}>
-        <div className="absolute inset-0 rounded-[1.1rem] bg-white shadow-brutal-lg border-2 border-black" />
-        <svg viewBox="0 0 120 120" className="relative h-full w-full" aria-hidden="true">
+        <div className="absolute inset-0 rounded-[1.1rem] bg-gradient-to-br from-fuchsia-100 via-orange-50 to-yellow-100 shadow-brutal-lg border-2 border-black" />
+        <svg viewBox="0 0 64 64" className="relative h-full w-full" aria-hidden="true">
           <defs>
-            <linearGradient id="schedora-bubble" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#ff4fd8" />
-              <stop offset="55%" stopColor="#ff8a3d" />
-              <stop offset="100%" stopColor="#ffd84d" />
-            </linearGradient>
-            <linearGradient id="schedora-body" x1="0%" y1="0%" x2="100%" y2="100%">
+            <linearGradient id="schedora-body-grad" x1="0%" y1="0%" x2="100%" y2="100%">
               <stop offset="0%" stopColor="#7d63ff" />
-              <stop offset="55%" stopColor="#4f8df7" />
-              <stop offset="100%" stopColor="#2ee6b7" />
+              <stop offset="55%" stopColor="#ff4fd8" />
+              <stop offset="100%" stopColor="#ff8a3d" />
             </linearGradient>
-            <linearGradient id="schedora-screen" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#172554" />
-              <stop offset="100%" stopColor="#1d4ed8" />
+            <linearGradient id="schedora-accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
+              <stop offset="0%" stopColor="#2ee6b7" />
+              <stop offset="100%" stopColor="#35d6c7" />
             </linearGradient>
           </defs>
 
-          <ellipse cx="60" cy="106" rx="34" ry="4" fill="rgba(0,0,0,0.08)" />
+          {/* Antenna */}
+          <path d="M32 12 L48 6" stroke="#111111" strokeWidth="2.5" strokeLinecap="round" />
+          <circle cx="49" cy="6" r="3.5" fill="#FFD84D" stroke="#111111" strokeWidth="1.5" />
 
-          <rect x="18" y="30" width="66" height="54" rx="22" fill="#ffffff" stroke="#2e2f55" strokeWidth="2.5" />
-          <rect x="26" y="40" width="50" height="32" rx="13" fill="url(#schedora-screen)" />
-          <circle cx="39" cy="56" r="6" fill="#72f5ff" />
-          <circle cx="63" cy="56" r="6" fill="#72f5ff" />
-          <path d="M46 62 C50 68, 58 68, 62 62" stroke="#72f5ff" strokeWidth="4" strokeLinecap="round" fill="none" />
+          {/* Robot head */}
+          <rect x="10" y="13" width="44" height="30" rx="11" fill="url(#schedora-body-grad)" stroke="#111111" strokeWidth="2.5" />
 
-          <rect x="22" y="84" width="56" height="34" rx="11" fill="#ffffff" stroke="url(#schedora-body)" strokeWidth="4" />
-          <path d="M40 99 L49 108 L67 90" stroke="#35d6c7" strokeWidth="8" strokeLinecap="round" strokeLinejoin="round" fill="none" />
+          {/* Screen */}
+          <rect x="16" y="19" width="32" height="18" rx="7" fill="#FFFFFF" stroke="#111111" strokeWidth="1.5" />
 
-          <path d="M16 56 C10 57, 8 72, 14 77 C17 80, 20 80, 22 77 L22 56 Z" fill="url(#schedora-body)" />
-          <path d="M84 56 C90 57, 92 72, 86 77 C83 80, 80 80, 78 77 L78 56 Z" fill="url(#schedora-body)" />
-          <path d="M60 26 C68 18, 74 13, 82 8" stroke="url(#schedora-body)" strokeWidth="5" strokeLinecap="round" />
-          <circle cx="86" cy="10" r="5" fill="url(#schedora-bubble)" />
+          {/* Eyes */}
+          <circle cx="25" cy="28" r="3" fill="#111111" />
+          <circle cx="39" cy="28" r="3" fill="#111111" />
+          <circle cx="26" cy="27" r="1" fill="#FFFFFF" />
+          <circle cx="40" cy="27" r="1" fill="#FFFFFF" />
 
-          <path d="M79 8 C82 8, 86 12, 86 17 C86 28, 99 32, 104 31 C98 37, 89 38, 82 34 C76 30, 73 24, 73 18 C73 13, 75 8, 79 8 Z" fill="url(#schedora-bubble)" />
-          <circle cx="84" cy="18" r="2.8" fill="#ffffff" />
-          <circle cx="92" cy="20" r="2.8" fill="#ffffff" />
-          <circle cx="100" cy="22" r="2.8" fill="#ffffff" />
+          {/* Side ears */}
+          <rect x="6" y="22" width="4" height="12" rx="2" fill="url(#schedora-body-grad)" stroke="#111111" strokeWidth="1.5" />
+          <rect x="54" y="22" width="4" height="12" rx="2" fill="url(#schedora-body-grad)" stroke="#111111" strokeWidth="1.5" />
+
+          {/* Checkmark badge below (the "schedule done" mark) */}
+          <rect x="14" y="44" width="36" height="14" rx="6" fill="#FFFFFF" stroke="#111111" strokeWidth="2" />
+          <path d="M21 51 L26 56 L36 46" stroke="url(#schedora-accent-grad)" strokeWidth="3.5" strokeLinecap="round" strokeLinejoin="round" fill="none" />
         </svg>
       </div>
 

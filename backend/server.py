@@ -146,15 +146,22 @@ def calculate_token_cost(content):
         "urls": detection["urls"]
     }
 
+ADMIN_ROLES = {"admin", "owner"}
+
 async def deduct_tokens(user, tokens):
-    """Deduct tokens from user balance. Returns (success, message)."""
+    """Deduct tokens from user balance. Returns (success, message).
+    Admin/owner accounts have unlimited credits and never get deducted — they
+    must be able to test every feature without being blocked."""
     if not user:
         return False, "User not found"
-    
+
+    if user.get("role") in ADMIN_ROLES:
+        return True, "Admin bypass — unlimited credits"
+
     current_balance = user.get("tokens", 0)
     if current_balance < tokens:
         return False, f"Not enough credits. Need {tokens} credits, you have {current_balance}."
-    
+
     await db.users.update_one(
         {"_id": user["_id"]},
         {"$inc": {"tokens": -tokens}}
@@ -349,7 +356,6 @@ def normalize_media_urls(values: Any) -> List[str]:
 
 
 # ─── Plan Helpers ─────────────────────────────────────────────────────────────
-ADMIN_ROLES = {"admin", "owner"}
 
 def get_plan(user: dict) -> dict:
     if user.get("role") in ADMIN_ROLES:

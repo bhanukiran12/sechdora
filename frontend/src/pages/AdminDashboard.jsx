@@ -8,6 +8,7 @@ import {
 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
+import SchedoraCoin from '@/components/SchedoraCoin';
 
 const BACKEND_URL = "/api";
 
@@ -166,7 +167,7 @@ export default function AdminDashboard() {
                 <Zap className="w-5 h-5 text-yellow-500" /> Token Usage
               </h3>
               <div className="mb-4">
-                <div className="text-4xl font-black">{stats?.tokens?.total_used ?? 0} 🪙</div>
+                <div className="text-4xl font-black inline-flex items-center gap-2">{stats?.tokens?.total_used ?? 0} <SchedoraCoin size={32} /></div>
                 <div className="text-text-muted font-bold text-sm">Total credits consumed</div>
               </div>
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
@@ -272,7 +273,7 @@ export default function AdminDashboard() {
                         <td className="px-4 py-3">
                           <span className="font-black text-xs uppercase px-2 py-0.5 bg-primary/10 rounded-full">{u.plan}</span>
                         </td>
-                        <td className="px-4 py-3 font-black">{u.tokens} 🪙</td>
+                        <td className="px-4 py-3 font-black"><span className="inline-flex items-center gap-1">{u.tokens} <SchedoraCoin size={14} /></span></td>
                         <td className="px-4 py-3 font-bold">{u.postsThisMonth}</td>
                         <td className="px-4 py-3">
                           <span className={`text-[10px] font-black uppercase px-2 py-0.5 rounded-full ${USER_STATUS_STYLE[u.status] || USER_STATUS_STYLE.inactive}`}>

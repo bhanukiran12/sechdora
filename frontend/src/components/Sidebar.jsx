@@ -1,26 +1,31 @@
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins } from "lucide-react";
+import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap } from "lucide-react";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SchedoraLogo from "@/components/SchedoraLogo";
+import SchedoraCoin from "@/components/SchedoraCoin";
 
 const API = `/api`;
 
-function TokenBadge({ tokens }) {
+function TokenBadge({ tokens, isAdmin }) {
+  const display = isAdmin ? "∞" : (tokens ?? 0);
   const postsLeft = Math.floor((tokens ?? 0) / 3);
   return (
     <div
       className="relative group"
-      title={`${tokens ?? 0} credits remaining (~${postsLeft} standard posts)`}
+      title={isAdmin ? "Admin — unlimited Schedora coins" : `${tokens ?? 0} Schedora coins (~${postsLeft} standard posts)`}
     >
-      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-yellow-400 bg-gradient-to-r from-yellow-50 to-amber-50 shadow-sm cursor-default select-none">
-        <span className="text-lg leading-none" role="img" aria-label="credits">🪙</span>
-        <span className="font-black text-sm text-yellow-700">{tokens ?? 0}</span>
+      <div className="flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-black bg-gradient-to-r from-fuchsia-50 via-orange-50 to-yellow-50 shadow-sm cursor-default select-none">
+        <SchedoraCoin size={20} />
+        <span className="font-black text-sm text-text-primary">{display}</span>
       </div>
-      <div className="absolute bottom-full left-0 mb-2 w-52 bg-black text-white text-xs font-bold rounded-xl px-3 py-2 shadow-brutal pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
-        {tokens ?? 0} credits remaining<br />
-        <span className="font-normal text-white/70">~{postsLeft} standard posts left</span>
+      <div className="absolute bottom-full left-0 mb-2 w-56 bg-black text-white text-xs font-bold rounded-xl px-3 py-2 shadow-brutal pointer-events-none opacity-0 group-hover:opacity-100 transition-opacity z-50 whitespace-nowrap">
+        {isAdmin ? (
+          <>Admin — unlimited Schedora coins<br /><span className="font-normal text-white/70">No limits on any feature</span></>
+        ) : (
+          <>{tokens ?? 0} Schedora coins<br /><span className="font-normal text-white/70">~{postsLeft} standard posts left</span></>
+        )}
       </div>
     </div>
   );
@@ -93,7 +98,7 @@ export default function Sidebar({ active }) {
 
       {user && (
         <div className="mb-4">
-          <TokenBadge tokens={user.tokens} />
+          <TokenBadge tokens={user.tokens} isAdmin={user?.role === 'admin' || user?.role === 'owner'} />
         </div>
       )}
 
