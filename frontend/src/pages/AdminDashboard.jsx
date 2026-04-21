@@ -9,7 +9,7 @@ import {
 import { useNavigate } from 'react-router-dom';
 import { motion } from 'framer-motion';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
+const BACKEND_URL = "/api";
 
 const PLATFORM_ICONS = {
   twitter: Twitter, linkedin: Linkedin, facebook: Facebook,
@@ -48,9 +48,9 @@ export default function AdminDashboard() {
     setLoading(true);
     try {
       const [statsRes, usersRes, feedbackRes] = await Promise.all([
-        axios.get(`${BACKEND_URL}/api/admin/stats`, { headers }),
-        axios.get(`${BACKEND_URL}/api/admin/users`, { headers }),
-        axios.get(`${BACKEND_URL}/api/admin/feedback`, { headers }),
+        axios.get(`${BACKEND_URL}/admin/stats`, { headers }),
+        axios.get(`${BACKEND_URL}/admin/users`, { headers }),
+        axios.get(`${BACKEND_URL}/admin/feedback`, { headers }),
       ]);
       setStats(statsRes.data);
       setUsers(usersRes.data);

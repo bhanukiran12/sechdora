@@ -7,7 +7,7 @@ import usePlan from "@/hooks/usePlan";
 import UpgradeModal from "@/components/UpgradeModal";
 import { useNavigate } from "react-router-dom";
 
-const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
+const API = `/api`;
 
 export default function Analytics() {
   const [analytics, setAnalytics] = useState(null);

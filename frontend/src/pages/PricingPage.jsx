@@ -5,8 +5,8 @@ import { toast } from "sonner";
 import { Check, X, Zap, Crown, Star } from "lucide-react";
 import SchedoraLogo from "@/components/SchedoraLogo";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = "/api";
+const API = "/api";
 
 const DEFAULT_PLANS = [
   { id: "free", name: "Free", price: 0, maxAccounts: 1, maxPostsPerMonth: 10, aiEnabled: false, jobPosting: false, jobExport: false, prioritySupport: false },

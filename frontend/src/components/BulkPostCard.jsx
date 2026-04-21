@@ -5,8 +5,8 @@ import { toast } from 'sonner';
 import { PLATFORMS } from '@/constants/platforms';
 import { motion, AnimatePresence } from 'framer-motion';
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = "/api";
+const API = "/api";
 
 const MAX_IMAGES = 10;
 

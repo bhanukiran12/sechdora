@@ -11,8 +11,8 @@ import { motion, AnimatePresence } from "framer-motion";
 import { useNavigate } from "react-router-dom";
 import usePlan from "@/hooks/usePlan";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = "/api";
+const API = "/api";
 
 export default function BulkUpload() {
   const navigate = useNavigate();

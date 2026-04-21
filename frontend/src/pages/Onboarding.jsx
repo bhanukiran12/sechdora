@@ -5,7 +5,7 @@ import { toast } from "sonner";
 import { ArrowRight, Calendar, GraduationCap, BriefcaseBusiness, Sparkles as SparkleIcon, SkipForward, CheckCircle2, PencilLine, Clock3 } from "lucide-react";
 import SchedoraLogo from "@/components/SchedoraLogo";
 
-const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
+const API = `/api`;
 
 const CREATOR_TYPES = [
   { id: "educator", label: "Educator", desc: "Online courses, tutorials, tips", icon: GraduationCap },

@@ -5,8 +5,8 @@ import { Briefcase, Plus, Trash2, Copy, Download, Lock, Sparkles, Search, Send, 
 import Sidebar from "@/components/Sidebar";
 import UpgradeModal from "@/components/UpgradeModal";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = "/api";
+const API = "/api";
 
 export default function JobPosts() {
   const [jobs, setJobs] = useState([]);

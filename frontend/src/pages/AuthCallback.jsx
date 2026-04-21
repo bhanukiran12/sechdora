@@ -3,7 +3,7 @@ import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
 
-const API = `${process.env.REACT_APP_BACKEND_URL ?? ""}/api`;
+const API = `/api`;
 
 export default function AuthCallback() {
   const navigate = useNavigate();

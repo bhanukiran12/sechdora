@@ -17,7 +17,7 @@ import {
 } from "@/components/ui/tooltip";
 import { PLATFORMS } from "@/constants/platforms";
 
-const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
+const API = `/api`;
 
 function NotificationBell() {
   const [count, setCount] = useState(0);

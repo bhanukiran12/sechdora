@@ -5,8 +5,8 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Calendar as CalendarIcon, PlusCircle, GripVertical, RefreshCw, PencilLine, Trash2, X, Loader2, RotateCcw } from "lucide-react";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = "/api";
+const API = "/api";
 
 export default function CalendarView() {
   const navigate = useNavigate();

@@ -9,7 +9,7 @@ import {
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 
-const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
+const API = `/api`;
 
 const TOKEN_PACKS = [
   { id: "pack_200", tokens: 200, price: 199, label: "Starter", color: "bg-blue-50 border-blue-400", badge: "" },

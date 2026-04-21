@@ -4,8 +4,8 @@ import { toast } from "sonner";
 import { Star, X, Check, Copy } from "lucide-react";
 import { motion, AnimatePresence } from "framer-motion";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = "/api";
+const API = "/api";
 
 const QUICK_TAGS = [
   "Easy to use",

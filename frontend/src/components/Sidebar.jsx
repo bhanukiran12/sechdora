@@ -5,7 +5,7 @@ import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
 import SchedoraLogo from "@/components/SchedoraLogo";
 
-const API = `${process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com"}/api`;
+const API = `/api`;
 
 function TokenBadge({ tokens }) {
   const postsLeft = Math.floor((tokens ?? 0) / 3);

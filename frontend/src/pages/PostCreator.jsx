@@ -10,8 +10,8 @@ import UpgradeModal from "@/components/UpgradeModal";
 import { detectUrl, calculateTokenCost } from "@/utils/tokens";
 import usePlan from "@/hooks/usePlan";
 
-const BACKEND_URL = process.env.REACT_APP_BACKEND_URL ?? "https://sechdora.onrender.com";
-const API = `${BACKEND_URL}/api`;
+const BACKEND_URL = "/api";
+const API = "/api";
 
 const PLATFORMS = [
   { id: 'linkedin', name: 'LinkedIn' },

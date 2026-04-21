@@ -4,7 +4,7 @@ import axios from "axios";
 import { toast } from "sonner";
 import { Users, Mail, Shield, Trash2, CheckCircle, XCircle } from "lucide-react";
 
-const API = `${process.env.REACT_APP_BACKEND_URL}/api`;
+const API = `/api`;
 
 export default function AdminPanel() {
   const [teamMembers, setTeamMembers] = useState([]);
