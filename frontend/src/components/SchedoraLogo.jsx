@@ -62,7 +62,7 @@ export default function SchedoraLogo({ size = "md", showWordmark = true, classNa
             Schedora
           </div>
           <div className="mt-1 text-[10px] font-black uppercase tracking-[0.28em] text-text-muted">
-            AI scheduling platform
+            Content & outreach workflows
           </div>
         </div>
       )}

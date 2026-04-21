@@ -113,9 +113,9 @@ export default function PricingPage() {
   };
 
   const planMeta = {
-    free:     { icon: Star,  color: "bg-white",   badge: null,            btnClass: "bg-white text-text-primary" },
-    pro:      { icon: Zap,   color: "bg-blue-50",  badge: "Popular",       btnClass: "bg-blue-600 text-white" },
-    business: { icon: Crown, color: "bg-primary",  badge: "Most Powerful", btnClass: "bg-black text-white" },
+    free:     { icon: Star,  color: "bg-white",   badge: null,             tagline: "For getting started",                              btnClass: "bg-white text-text-primary" },
+    pro:      { icon: Zap,   color: "bg-blue-50", badge: "Popular",        tagline: "For active individual users",                       btnClass: "bg-blue-600 text-white" },
+    business: { icon: Crown, color: "bg-primary", badge: "Best for teams", tagline: "Best suited for teams and higher usage needs", btnClass: "bg-black text-white" },
   };
 
   if (loading) {
@@ -135,10 +135,10 @@ export default function PricingPage() {
             <SchedoraLogo size="sm" />
           </button>
           <h1 className="text-4xl sm:text-5xl font-black tracking-tighter mb-4">
-            Simple, Transparent Pricing
+            Plans that match your usage.
           </h1>
           <p className="text-text-secondary text-lg max-w-xl mx-auto">
-            Start free. Upgrade when you need more power.
+            Start free. Upgrade when your usage or team grows.
           </p>
           {(currentPlan?.planType || currentPlan?.plan?.planType) && (
             <div className="mt-4 inline-block bg-yellow-100 border-2 border-yellow-400 rounded-full px-5 py-2 font-bold text-sm text-yellow-800">
@@ -175,19 +175,24 @@ export default function PricingPage() {
                 <h2 className="text-2xl font-black mb-1">{plan.name}</h2>
                 <div className="text-3xl font-black mb-1">
                   {plan.price === 0 ? "Free" : `₹${plan.price.toLocaleString()}`}
-                  {plan.price > 0 && <span className="text-base font-bold text-text-secondary">/mo</span>}
+                  {plan.price > 0 && <span className={`text-base font-bold ${isBusiness ? "text-white/80" : "text-text-secondary"}`}>/mo</span>}
                 </div>
-                <div className="text-sm text-text-secondary mb-6 font-medium">
+                <div className={`text-sm mb-2 font-medium ${isBusiness ? "text-white/80" : "text-text-secondary"}`}>
                   {plan.price === 0 ? "Forever free" : "Billed monthly"}
                 </div>
+                {meta.tagline && (
+                  <div className={`text-xs font-bold mb-5 ${isBusiness ? "text-white/90" : "text-text-muted"}`}>
+                    {meta.tagline}
+                  </div>
+                )}
 
                 <ul className="space-y-2 flex-1 mb-6">
                   <li className="flex items-center gap-2 text-sm font-bold">
-                    <Check className="w-4 h-4 text-green-600 shrink-0" strokeWidth={3} />
+                    <Check className={`w-4 h-4 shrink-0 ${isBusiness ? "text-white" : "text-green-600"}`} strokeWidth={3} />
                     {plan.maxAccounts} connected account{plan.maxAccounts !== 1 ? "s" : ""}
                   </li>
                   <li className="flex items-center gap-2 text-sm font-bold">
-                    <Check className="w-4 h-4 text-green-600 shrink-0" strokeWidth={3} />
+                    <Check className={`w-4 h-4 shrink-0 ${isBusiness ? "text-white" : "text-green-600"}`} strokeWidth={3} />
                     {plan.maxPostsPerMonth === "unlimited" ? "Unlimited posts/month" : `${plan.maxPostsPerMonth} posts/month`}
                   </li>
                   {[
@@ -196,10 +201,10 @@ export default function PricingPage() {
                     { key: "jobExport", label: "Job post export" },
                     { key: "prioritySupport", label: "Priority support" },
                   ].map(({ key, label }) => (
-                    <li key={key} className={`flex items-center gap-2 text-sm font-bold ${!plan[key] ? "opacity-40" : ""}`}>
+                    <li key={key} className={`flex items-center gap-2 text-sm font-bold ${!plan[key] ? (isBusiness ? "text-white/70" : "text-text-muted") : ""}`}>
                       {plan[key]
-                        ? <Check className="w-4 h-4 text-green-600 shrink-0" strokeWidth={3} />
-                        : <X className="w-4 h-4 text-red-400 shrink-0" strokeWidth={3} />
+                        ? <Check className={`w-4 h-4 shrink-0 ${isBusiness ? "text-white" : "text-green-600"}`} strokeWidth={3} />
+                        : <X className={`w-4 h-4 shrink-0 ${isBusiness ? "text-white/70" : "text-text-muted"}`} strokeWidth={3} />
                       }
                       {label}
                     </li>

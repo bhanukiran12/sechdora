@@ -1,0 +1,181 @@
+Act as a senior SaaS branding strategist, UX writer, and conversion-focused landing page expert.
+
+----------------------------------------
+
+PRODUCT:
+
+Name: Schedora
+
+Schedora is a structured content and outreach workflow platform.
+
+It helps users:
+- Draft and organize content using AI assistance
+- Schedule posts across platforms
+- Manage job posts and outreach workflows
+- Control usage through a token-based system
+
+----------------------------------------
+
+STRICT BRANDING RULES:
+
+- Do NOT exaggerate capabilities
+- Do NOT promise outcomes like:
+  "go viral", "guaranteed growth", "instant leads"
+- Do NOT create fake metrics or testimonials
+- Use realistic, capability-based language
+- Keep messaging strong but credible
+
+----------------------------------------
+
+POSITIONING:
+
+Schedora is NOT just a scheduler.
+
+It is:
+"A structured workflow platform for content and outreach."
+
+Focus on:
+- organization
+- consistency
+- control
+
+----------------------------------------
+
+TARGET USERS:
+
+- Professionals building presence on social platforms
+- Recruiters managing job workflows
+- Founders and freelancers handling content + outreach
+
+----------------------------------------
+
+TONE:
+
+- Clear
+- Confident
+- Professional
+- Calm (no hype language)
+
+----------------------------------------
+
+HERO SECTION:
+
+Headline:
+"Bring structure to your content and outreach."
+
+Alternative:
+"Manage content and outreach workflows in one place."
+
+Subheadline:
+"Draft posts, schedule them, and organize your workflows with AI-assisted tools."
+
+CTA:
+- Start Free
+- View Plans
+
+----------------------------------------
+
+PROBLEM SECTION:
+
+Write relatable, realistic problems:
+
+- "Managing posts and outreach across tools can become messy."
+- "Consistency is difficult without a structured system."
+
+----------------------------------------
+
+SOLUTION SECTION:
+
+"Schedora helps you bring structure to how you create, schedule, and manage content and job-related workflows."
+
+----------------------------------------
+
+FEATURES (NO HYPE)
+
+- AI Assistance:
+  "Generate drafts, hooks, and structured content ideas."
+
+- Scheduling:
+  "Plan and publish posts at selected times."
+
+- Bulk Upload:
+  "Create multiple posts or jobs using a manual editor or CSV."
+
+- Job Workflow:
+  "Create and manage job posts in a structured format."
+
+- Token System:
+  "Use credits based on actions, giving you flexible control over usage."
+
+----------------------------------------
+
+HOW IT WORKS:
+
+1. Create or import content  
+2. Edit or generate drafts using AI  
+3. Schedule posts or manage workflows  
+
+----------------------------------------
+
+PRICING SECTION (CLEAR & HONEST)
+
+FREE:
+- Basic usage
+- Limited posts
+
+PRO:
+- Multiple accounts
+- AI assistance features
+
+BUSINESS:
+- Advanced workflows
+- Job management
+- Platform integrations (e.g., Twitter access)
+
+Highlight BUSINESS as:
+"Best suited for teams and higher usage needs"
+
+----------------------------------------
+
+TRANSPARENCY SECTION:
+
+"What Schedora Helps With"
+
+- Organizing content workflows
+- Drafting posts efficiently
+- Managing job-related tasks
+
+"What Schedora Does Not Do"
+
+- Does not guarantee engagement or reach
+- Does not replace human strategy
+- Does not automate unsolicited outreach
+
+----------------------------------------
+
+UI & DESIGN GUIDELINES:
+
+- Clean SaaS layout
+- Strong contrast (fix visibility issues)
+- Consistent icon system (including token coin icon)
+- Clear empty states (no blank pages)
+- Simple navigation
+
+----------------------------------------
+
+OUTPUT REQUIRED:
+
+1. Full landing page copy (section-wise)
+2. UI layout suggestions
+3. Brand voice guidelines
+4. CTA placements
+5. Microcopy for buttons and tooltips
+
+----------------------------------------
+
+FINAL GOAL:
+
+Create a trustworthy, structured, and professional SaaS brand that:
+- Sets correct expectations
+- Feels reliable
+- Still drives conversions without hype

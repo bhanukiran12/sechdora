@@ -2,127 +2,119 @@ import { useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
   Calendar,
-  Zap,
-  BarChart3,
   CheckCircle2,
   ArrowRight,
   Sparkles,
-  Clock3,
   Layers3,
   MessageSquareText,
   ShieldCheck,
-  PlayCircle,
   Users,
-  TrendingUp,
   FileSpreadsheet,
   Brain,
-  Instagram,
-  Linkedin,
-  ShieldAlert,
+  Briefcase,
+  Coins,
+  XCircle,
+  Clock3,
 } from "lucide-react";
 import SchedoraLogo from "@/components/SchedoraLogo";
 
 const FEATURE_CARDS = [
   {
-    icon: Calendar,
-    title: "Schedule in one place",
-    copy: "Plan posts across Instagram and LinkedIn without juggling tabs, reminders, or spreadsheets.",
+    icon: Brain,
+    title: "AI Assistance",
+    copy: "Generate drafts, hooks, and structured content ideas with AI-assisted tools.",
   },
   {
-    icon: Brain,
-    title: "Improve captions with AI",
-    copy: "Turn rough drafts into clean, platform-ready posts without losing your voice.",
+    icon: Calendar,
+    title: "Scheduling",
+    copy: "Plan and publish posts at selected times across supported platforms.",
   },
   {
     icon: FileSpreadsheet,
-    title: "Bulk workflows",
-    copy: "Use manual editor and CSV upload flows to queue posts faster when you are planning in batches.",
+    title: "Bulk Upload",
+    copy: "Create multiple posts or jobs using a manual editor or CSV import.",
   },
   {
-    icon: BarChart3,
-    title: "See what is working",
-    copy: "Track engagement, identify patterns, and make better posting decisions with fewer guesses.",
+    icon: Briefcase,
+    title: "Job Workflow",
+    copy: "Create and manage job posts in a structured, organized format.",
+  },
+  {
+    icon: Coins,
+    title: "Token System",
+    copy: "Use credits based on actions, giving you flexible control over usage.",
   },
 ];
 
 const WORKFLOW_STEPS = [
   {
     step: "01",
-    title: "Capture the idea",
-    copy: "Start with a draft, a rough note, or a caption idea you already had in mind.",
+    title: "Create or import content",
+    copy: "Bring in an existing draft or start from a blank post inside Schedora.",
   },
   {
     step: "02",
-    title: "Refine with AI",
-    copy: "Polish the copy, tighten the hook, and adapt it for the platform you are posting to.",
+    title: "Edit or generate drafts using AI",
+    copy: "Refine the wording, generate alternatives, or polish the structure with AI assistance.",
   },
   {
     step: "03",
-    title: "Attach media",
-    copy: "Add images, keep them organized, and avoid URL headaches during upload.",
-  },
-  {
-    step: "04",
-    title: "Schedule and move on",
-    copy: "Lock in a time, publish on schedule, and get back to work instead of babysitting posts.",
+    title: "Schedule posts or manage workflows",
+    copy: "Publish on a chosen schedule or organize ongoing job and outreach workflows.",
   },
 ];
 
-const COMPARISONS = [
-  {
-    name: "Buffer",
-    summary: "Simple scheduling and a clean workflow.",
-    edge: "Schedora adds a more AI-first content flow.",
-  },
-  {
-    name: "Hootsuite",
-    summary: "Powerful for bigger teams and broad social ops.",
-    edge: "Schedora stays lighter for creators and small businesses.",
-  },
-  {
-    name: "Later",
-    summary: "Strong for visual planning and Instagram-first teams.",
-    edge: "Schedora puts creation, editing, and publishing closer together.",
-  },
+const HELPS_WITH = [
+  "Organizing content workflows",
+  "Drafting posts efficiently",
+  "Managing job-related tasks",
+];
+
+const DOES_NOT_DO = [
+  "Does not guarantee engagement or reach",
+  "Does not replace human strategy",
+  "Does not automate unsolicited outreach",
 ];
 
 const FAQS = [
   {
     q: "What is Schedora?",
-    a: "Schedora is an AI-powered social media scheduling and content automation platform for creators, educators, and small businesses.",
+    a: "Schedora is a structured workflow platform that helps you draft content, schedule posts, and manage job-related workflows in one place.",
   },
   {
     q: "Which platforms does it support?",
-    a: "Schedora is built around Instagram and LinkedIn workflows today, with more channels in the product roadmap.",
+    a: "Schedora supports posting to major social platforms such as Instagram and LinkedIn today, with additional integrations available on the Business plan.",
   },
   {
-    q: "Can I use Schedora as a Buffer alternative?",
-    a: "Yes. Schedora is positioned as a simpler, AI-assisted scheduling workflow for teams that want creation and publishing in one place.",
+    q: "How does the token system work?",
+    a: "Most actions in Schedora — like generating an AI draft, scheduling a post, or exporting a job — use a small number of credits. This keeps usage flexible and predictable.",
   },
   {
     q: "Does Schedora help with content creation?",
-    a: "Yes. It includes AI caption improvement and fast draft-to-schedule flows so you can create posts more quickly.",
+    a: "Yes. Schedora includes AI-assisted drafting, hook ideas, and structured content suggestions to help you write posts faster.",
   },
   {
-    q: "Is Schedora good for small teams?",
-    a: "Yes. It is designed for users who want clarity, speed, and fewer tools in the workflow.",
+    q: "Is Schedora suitable for small teams?",
+    a: "Yes. The Business plan is designed for teams and higher usage needs, with advanced workflows and additional platform integrations.",
   },
 ];
 
 function useLandingSeo() {
   useEffect(() => {
     const prevTitle = document.title;
-    document.title = "Schedora | AI Social Media Scheduling Tool";
+    document.title = "Schedora | Structured workflows for content and outreach";
+
+    const description = "Schedora is a structured workflow platform for content and outreach. Draft posts, schedule them, and organize workflows with AI-assisted tools.";
 
     const metaPairs = [
-      ["description", "Plan, write, and schedule social posts faster with Schedora, the AI-powered content automation platform for creators and small businesses."],
+      ["description", description],
       ["robots", "index,follow,max-image-preview:large,max-snippet:-1,max-video-preview:-1"],
-      ["og:title", "Schedora | AI Social Media Scheduling Tool"],
-      ["og:description", "Plan, write, and schedule social posts faster with Schedora, the AI-powered content automation platform for creators and small businesses."],
+      ["og:title", "Schedora | Structured workflows for content and outreach"],
+      ["og:description", description],
       ["og:type", "website"],
       ["twitter:card", "summary_large_image"],
-      ["twitter:title", "Schedora | AI Social Media Scheduling Tool"],
-      ["twitter:description", "Plan, write, and schedule social posts faster with Schedora, the AI-powered content automation platform for creators and small businesses."],
+      ["twitter:title", "Schedora | Structured workflows for content and outreach"],
+      ["twitter:description", description],
     ];
 
     const created = [];
@@ -171,7 +163,7 @@ function useLandingSeo() {
           name: "Schedora",
           applicationCategory: "BusinessApplication",
           operatingSystem: "Web",
-          description: "AI-powered social media scheduling and content automation platform.",
+          description: "Structured workflow platform for content and outreach.",
         },
         {
           "@type": "FAQPage",
@@ -211,9 +203,15 @@ export default function Landing() {
           </a>
 
           <div className="flex items-center gap-3">
-            <a href="#pricing" className="hidden sm:inline text-sm font-bold text-text-secondary hover:text-text-primary transition-colors">
-              Compare
+            <a href="#features" className="hidden sm:inline text-sm font-bold text-text-secondary hover:text-text-primary transition-colors">
+              Features
             </a>
+            <button
+              onClick={() => navigate("/pricing")}
+              className="hidden sm:inline-flex brutal-button bg-white text-text-primary rounded-xl text-sm"
+            >
+              View Plans
+            </button>
             <button
               onClick={() => navigate("/login")}
               className="brutal-button bg-primary text-white rounded-xl"
@@ -232,7 +230,7 @@ export default function Landing() {
             <div className="max-w-2xl">
               <div className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] shadow-brutal">
                 <Sparkles className="h-4 w-4 text-primary" />
-                Built for creators, educators, and small businesses
+                Structured workflows for content and outreach
               </div>
 
               <div className="mt-6">
@@ -240,11 +238,11 @@ export default function Landing() {
               </div>
 
               <h1 className="mt-6 text-5xl font-black font-heading tracking-tighter sm:text-6xl lg:text-7xl text-balance">
-                Plan, write, and schedule social posts faster with AI.
+                Bring structure to your content and outreach.
               </h1>
 
               <p className="mt-6 max-w-xl text-lg leading-relaxed text-text-secondary">
-                Schedora is the social media scheduling tool that turns content ideas into published posts without the spreadsheet chaos, copy-paste loops, or last-minute panic.
+                Draft posts, schedule them, and organize your workflows with AI-assisted tools.
               </p>
 
               <div className="mt-8 flex flex-col gap-3 sm:flex-row">
@@ -255,37 +253,25 @@ export default function Landing() {
                 >
                   Start Free
                 </button>
-                <a
-                  href="#how-it-works"
+                <button
+                  onClick={() => navigate("/pricing")}
                   className="brutal-button bg-white text-text-primary rounded-xl text-sm sm:text-base inline-flex items-center justify-center gap-2"
+                  data-testid="hero-view-plans"
                 >
-                  See How It Works <ArrowRight className="h-4 w-4" />
-                </a>
+                  View Plans <ArrowRight className="h-4 w-4" />
+                </button>
               </div>
 
               <div className="mt-8 flex flex-wrap gap-3 text-sm font-bold text-text-secondary">
                 {[
-                  "AI caption improvement",
-                  "Instagram and LinkedIn scheduling",
-                  "Bulk upload workflows",
-                  "Cleaner content planning",
+                  "AI-assisted drafting",
+                  "Scheduling across platforms",
+                  "Bulk post and job workflows",
+                  "Token-based usage control",
                 ].map((item) => (
                   <div key={item} className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-3 py-2 shadow-brutal">
                     <CheckCircle2 className="h-4 w-4 text-primary" />
                     {item}
-                  </div>
-                ))}
-              </div>
-
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                {[
-                  { label: "Time to first post", value: "10 min" },
-                  { label: "Core platforms", value: "IG + LinkedIn" },
-                  { label: "Workflow", value: "Plan to publish" },
-                ].map((item) => (
-                  <div key={item.label} className="rounded-xl border-2 border-black bg-white p-4 shadow-brutal">
-                    <div className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">{item.label}</div>
-                    <div className="mt-2 text-lg font-black font-heading">{item.value}</div>
                   </div>
                 ))}
               </div>
@@ -297,12 +283,12 @@ export default function Landing() {
               <div className="relative rounded-xl border-4 border-black bg-white p-4 shadow-brutal-lg">
                 <div className="flex items-center justify-between border-b-2 border-black pb-3">
                   <div>
-                    <div className="text-xs font-black uppercase tracking-[0.24em] text-text-muted">Live preview</div>
-                    <div className="text-xl font-black font-heading">Content workspace</div>
+                    <div className="text-xs font-black uppercase tracking-[0.24em] text-text-muted">Workspace preview</div>
+                    <div className="text-xl font-black font-heading">Content workflow</div>
                   </div>
                   <div className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-aiAccent px-3 py-1 text-[10px] font-black uppercase tracking-[0.2em]">
-                    <PlayCircle className="h-4 w-4" />
-                    Ready
+                    <Sparkles className="h-4 w-4" />
+                    AI assisted
                   </div>
                 </div>
 
@@ -313,29 +299,33 @@ export default function Landing() {
                     </div>
                     <div className="mt-3 space-y-2">
                       <div className="rounded-xl border-2 border-black bg-white p-3 shadow-brutal">
-                        <div className="text-sm font-black">Improve the reach of this launch post</div>
-                        <div className="mt-1 text-xs text-text-muted">AI suggested CTA + platform edit</div>
+                        <div className="text-sm font-black">Launch announcement</div>
+                        <div className="mt-1 text-xs text-text-muted">Draft · AI suggestions ready</div>
                       </div>
                       <div className="rounded-xl border-2 border-black bg-white p-3 shadow-brutal">
-                        <div className="text-sm font-black">Instagram caption for the feature drop</div>
-                        <div className="mt-1 text-xs text-text-muted">Ready for scheduling</div>
+                        <div className="text-sm font-black">Feature update caption</div>
+                        <div className="mt-1 text-xs text-text-muted">Ready to schedule</div>
+                      </div>
+                      <div className="rounded-xl border-2 border-black bg-white p-3 shadow-brutal">
+                        <div className="text-sm font-black">Senior Designer · Job post</div>
+                        <div className="mt-1 text-xs text-text-muted">Workflow in review</div>
                       </div>
                     </div>
                   </div>
 
                   <div className="rounded-xl border-2 border-black bg-aiAccent/25 p-4">
                     <div className="flex items-center gap-2 text-xs font-black uppercase tracking-[0.2em] text-text-muted">
-                      <TrendingUp className="h-4 w-4" /> Publishing signals
+                      <Calendar className="h-4 w-4" /> This week
                     </div>
                     <div className="mt-3 space-y-3">
                       {[
-                        { label: "Scheduled", value: "12" },
-                        { label: "Published", value: "84" },
-                        { label: "AI improved", value: "29" },
+                        { label: "Drafts", state: "In progress" },
+                        { label: "Scheduled", state: "Queued" },
+                        { label: "Job workflows", state: "Active" },
                       ].map((item) => (
                         <div key={item.label} className="rounded-xl border-2 border-black bg-white p-3 shadow-brutal">
                           <div className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">{item.label}</div>
-                          <div className="mt-1 text-2xl font-black font-heading">{item.value}</div>
+                          <div className="mt-1 text-base font-black font-heading">{item.state}</div>
                         </div>
                       ))}
                     </div>
@@ -350,29 +340,24 @@ export default function Landing() {
           <div className="max-w-3xl">
             <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">The problem</div>
             <h2 className="mt-3 text-3xl font-black font-heading tracking-tight sm:text-4xl">
-              Social media work is still too fragmented.
+              Content and outreach work spreads across too many tools.
             </h2>
             <p className="mt-4 text-lg leading-relaxed text-text-secondary">
-              Most teams are not struggling because they lack ideas. They are struggling because the workflow is split across too many tools.
+              When drafts, schedules, and outreach live in separate places, it becomes harder to stay consistent and easy to lose track of what is happening.
             </p>
           </div>
 
-          <div className="mt-10 grid gap-6 md:grid-cols-3">
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
             {[
               {
                 icon: MessageSquareText,
-                title: "Ideas live in one place",
-                copy: "Drafts often start in notes or docs and never make it cleanly into a publishing flow.",
-              },
-              {
-                icon: ShieldAlert,
-                title: "Scheduling lives somewhere else",
-                copy: "When publishing happens in another tool, it is easy to lose momentum or miss the timing.",
+                title: "Managing posts and outreach across tools can become messy.",
+                copy: "Drafts in one place, scheduling in another, and outreach in a third makes the process fragile and slow.",
               },
               {
                 icon: Clock3,
-                title: "Every extra step costs time",
-                copy: "Copy-paste loops and manual cleanup create friction that compounds every week.",
+                title: "Consistency is difficult without a structured system.",
+                copy: "Without a clear workflow, posting and follow-ups depend on memory and ad-hoc effort instead of a repeatable process.",
               },
             ].map((card) => {
               const Icon = card.icon;
@@ -387,102 +372,110 @@ export default function Landing() {
           </div>
         </section>
 
-        <section className="container mx-auto px-6 py-16">
-          <div className="grid gap-10 lg:grid-cols-2 lg:items-start">
-            <div>
-              <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">The solution</div>
-              <h2 className="mt-3 text-3xl font-black font-heading tracking-tight sm:text-4xl">
-                Schedora brings the whole workflow into one fast path.
-              </h2>
-              <p className="mt-4 text-lg leading-relaxed text-text-secondary">
-                Create, refine, schedule, and review content without jumping between disconnected tools.
-              </p>
+        <section id="features" className="container mx-auto px-6 py-16">
+          <div className="max-w-3xl">
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">The solution</div>
+            <h2 className="mt-3 text-3xl font-black font-heading tracking-tight sm:text-4xl">
+              Schedora helps you bring structure to how you create, schedule, and manage content and job-related workflows.
+            </h2>
+          </div>
 
-              <div className="mt-8 space-y-4">
-                {FEATURE_CARDS.map((card) => {
-                  const Icon = card.icon;
-                  return (
-                    <div key={card.title} className="brutal-card p-5">
-                      <div className="flex items-start gap-4">
-                        <div className="rounded-xl border-2 border-black bg-white p-3 shadow-brutal">
-                          <Icon className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                          <h3 className="text-lg font-black font-heading">{card.title}</h3>
-                          <p className="mt-2 text-sm leading-relaxed text-text-secondary">{card.copy}</p>
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-
-            <div className="rounded-xl border-4 border-black bg-aiAccent p-6 shadow-brutal-lg">
-              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">
-                <Zap className="h-4 w-4" /> How teams use it
-              </div>
-              <div className="mt-5 grid gap-4">
-                {WORKFLOW_STEPS.map((item) => (
-                  <div key={item.step} className="rounded-xl border-2 border-black bg-white p-4 shadow-brutal">
-                    <div className="flex items-start gap-4">
-                      <div className="rounded-xl border-2 border-black bg-primary px-3 py-2 text-sm font-black text-white shadow-brutal">
-                        {item.step}
-                      </div>
-                      <div>
-                        <div className="text-lg font-black font-heading">{item.title}</div>
-                        <p className="mt-1 text-sm leading-relaxed text-text-secondary">{item.copy}</p>
-                      </div>
-                    </div>
+          <div className="mt-10 grid gap-5 md:grid-cols-2 lg:grid-cols-3">
+            {FEATURE_CARDS.map((card) => {
+              const Icon = card.icon;
+              return (
+                <div key={card.title} className="brutal-card p-6">
+                  <div className="rounded-xl border-2 border-black bg-white p-3 shadow-brutal w-fit">
+                    <Icon className="h-5 w-5 text-primary" />
                   </div>
-                ))}
-              </div>
-            </div>
+                  <h3 className="mt-4 text-lg font-black font-heading">{card.title}</h3>
+                  <p className="mt-2 text-sm leading-relaxed text-text-secondary">{card.copy}</p>
+                </div>
+              );
+            })}
           </div>
         </section>
 
-        <section id="pricing" className="container mx-auto px-6 py-16">
+        <section className="container mx-auto px-6 py-16">
           <div className="max-w-3xl">
-            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">Comparison</div>
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">How it works</div>
             <h2 className="mt-3 text-3xl font-black font-heading tracking-tight sm:text-4xl">
-              Buffer, Hootsuite, Later, or Schedora?
+              A simple three-step workflow.
             </h2>
-            <p className="mt-4 text-lg leading-relaxed text-text-secondary">
-              Each tool has a place. Schedora is for teams that want a tighter loop between writing, planning, and publishing.
-            </p>
           </div>
 
-          <div className="mt-10 grid gap-6 lg:grid-cols-3">
-            {COMPARISONS.map((item) => (
-              <div key={item.name} className="brutal-card p-6">
-                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">{item.name}</div>
-                <p className="mt-3 text-sm leading-relaxed text-text-secondary">{item.summary}</p>
-                <div className="mt-5 rounded-xl border-2 border-black bg-background p-4">
-                  <div className="text-[10px] font-black uppercase tracking-[0.2em] text-text-muted">Why people look at Schedora</div>
-                  <p className="mt-2 text-sm font-bold leading-relaxed">{item.edge}</p>
+          <div className="mt-10 grid gap-5 md:grid-cols-3">
+            {WORKFLOW_STEPS.map((item) => (
+              <div key={item.step} className="brutal-card p-6">
+                <div className="rounded-xl border-2 border-black bg-primary px-3 py-2 text-sm font-black text-white shadow-brutal w-fit">
+                  {item.step}
                 </div>
+                <div className="mt-4 text-lg font-black font-heading">{item.title}</div>
+                <p className="mt-2 text-sm leading-relaxed text-text-secondary">{item.copy}</p>
               </div>
             ))}
           </div>
         </section>
 
         <section className="container mx-auto px-6 py-16">
+          <div className="max-w-3xl">
+            <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">Transparency</div>
+            <h2 className="mt-3 text-3xl font-black font-heading tracking-tight sm:text-4xl">
+              Clear about what Schedora does — and what it does not do.
+            </h2>
+            <p className="mt-4 text-lg leading-relaxed text-text-secondary">
+              We want you to choose Schedora with the right expectations.
+            </p>
+          </div>
+
+          <div className="mt-10 grid gap-6 md:grid-cols-2">
+            <div className="brutal-card p-6">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">
+                <ShieldCheck className="h-4 w-4 text-green-600" /> What Schedora helps with
+              </div>
+              <ul className="mt-4 space-y-3">
+                {HELPS_WITH.map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-sm font-bold leading-relaxed">
+                    <CheckCircle2 className="h-5 w-5 text-green-600 shrink-0 mt-0.5" strokeWidth={3} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+
+            <div className="brutal-card p-6">
+              <div className="flex items-center gap-2 text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">
+                <XCircle className="h-4 w-4 text-text-secondary" /> What Schedora does not do
+              </div>
+              <ul className="mt-4 space-y-3">
+                {DOES_NOT_DO.map((item) => (
+                  <li key={item} className="flex items-start gap-3 text-sm font-bold leading-relaxed text-text-secondary">
+                    <XCircle className="h-5 w-5 text-text-muted shrink-0 mt-0.5" strokeWidth={2.5} />
+                    <span>{item}</span>
+                  </li>
+                ))}
+              </ul>
+            </div>
+          </div>
+        </section>
+
+        <section id="who-its-for" className="container mx-auto px-6 py-16">
           <div className="rounded-xl border-4 border-black bg-white p-8 shadow-brutal-lg">
             <div className="grid gap-8 lg:grid-cols-[1.1fr_0.9fr] lg:items-center">
               <div>
-                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">Built for growth</div>
+                <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">Who it's for</div>
                 <h2 className="mt-3 text-3xl font-black font-heading tracking-tight sm:text-4xl">
-                  Made for creators, educators, and small teams who need consistency.
+                  Built for people who want consistency and control.
                 </h2>
                 <p className="mt-4 text-lg leading-relaxed text-text-secondary">
-                  Schedora is designed to help you move faster without adding complexity. That makes it useful whether you post once a week or every day.
+                  Schedora suits professionals, recruiters, founders, and freelancers who manage content and outreach as part of their week.
                 </p>
               </div>
-              <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-1">
+              <div className="grid gap-4">
                 {[
-                  { icon: Instagram, label: "Creators", copy: "Ship more content with less friction." },
-                  { icon: Linkedin, label: "Educators", copy: "Build authority with consistent posts." },
-                  { icon: Users, label: "Small businesses", copy: "Keep marketing moving without a large team." },
+                  { icon: Sparkles, label: "Professionals", copy: "Build presence on social platforms with a steady rhythm." },
+                  { icon: Briefcase, label: "Recruiters", copy: "Manage job posts and candidate workflows in one place." },
+                  { icon: Users, label: "Founders & freelancers", copy: "Handle content and outreach without juggling extra tools." },
                 ].map((item) => {
                   const Icon = item.icon;
                   return (
@@ -508,7 +501,7 @@ export default function Landing() {
           <div className="max-w-3xl">
             <div className="text-[10px] font-black uppercase tracking-[0.3em] text-text-muted">FAQ</div>
             <h2 className="mt-3 text-3xl font-black font-heading tracking-tight sm:text-4xl">
-              Questions people ask before they switch.
+              Common questions.
             </h2>
           </div>
 
@@ -529,13 +522,13 @@ export default function Landing() {
           <div className="rounded-xl border-4 border-black bg-aiAccent p-8 text-center shadow-brutal-lg">
             <div className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-white px-4 py-2 text-[10px] font-black uppercase tracking-[0.24em] shadow-brutal">
               <ShieldCheck className="h-4 w-4" />
-              Launch-ready workflow
+              Start with the Free plan
             </div>
             <h2 className="mt-5 text-3xl font-black font-heading tracking-tight sm:text-4xl">
-              Start scheduling without the chaos.
+              Bring structure to your content and outreach.
             </h2>
             <p className="mx-auto mt-4 max-w-2xl text-lg leading-relaxed text-text-secondary">
-              If you want one place to create, improve, plan, and publish social posts, Schedora is ready.
+              Try Schedora for free. Upgrade when your usage or team grows.
             </p>
             <div className="mt-8 flex flex-col justify-center gap-3 sm:flex-row">
               <button
@@ -545,9 +538,13 @@ export default function Landing() {
               >
                 Start Free
               </button>
-              <a href="#top" className="brutal-button bg-white text-text-primary rounded-xl inline-flex items-center justify-center gap-2">
-                Back to top <ArrowRight className="h-4 w-4 rotate-[-90deg]" />
-              </a>
+              <button
+                onClick={() => navigate("/pricing")}
+                className="brutal-button bg-white text-text-primary rounded-xl inline-flex items-center justify-center gap-2"
+                data-testid="footer-view-plans"
+              >
+                View Plans <ArrowRight className="h-4 w-4" />
+              </button>
             </div>
           </div>
         </section>
@@ -556,7 +553,7 @@ export default function Landing() {
       <footer className="border-t-2 border-border bg-surface py-8">
         <div className="container mx-auto flex flex-col gap-4 px-6 sm:flex-row sm:items-center sm:justify-between">
           <p className="text-xs font-black uppercase tracking-[0.2em] text-text-muted">
-            © 2026 Schedora. Built for creators who want to ship faster.
+            © 2026 Schedora. Structured workflows for content and outreach.
           </p>
           <div className="flex gap-6">
             <a href="/privacy" className="text-xs text-text-muted hover:text-text-primary transition-colors">Privacy Policy</a>
