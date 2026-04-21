@@ -139,7 +139,7 @@ export default function Login() {
             {!showOtp && (
               <>
                 <a
-                  href={`${BACKEND_URL}/api/auth/google`}
+                  href={`/api/auth/google`}
                   className="w-full brutal-button bg-white text-text-primary flex items-center justify-center gap-3 font-bold py-2 text-sm no-underline"
                 >
                   <GoogleIcon />
