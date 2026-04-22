@@ -12,6 +12,8 @@ import usePlan from "@/hooks/usePlan";
 
 const BACKEND_URL = "/api";
 const API = "/api";
+const MAX_MEDIA_FILES = 10;
+const MAX_FILE_SIZE_MB = 10;
 
 const PLATFORMS = [
   { id: 'linkedin', name: 'LinkedIn' },
@@ -30,6 +32,7 @@ export default function PostCreator() {
   const [targetAccounts, setTargetAccounts] = useState({});
   const [platformCaptions, setPlatformCaptions] = useState({});
   const [mediaUrls, setMediaUrls] = useState([]);
+  const [mediaPreviewUrls, setMediaPreviewUrls] = useState([]);
   const [scheduledDate, setScheduledDate] = useState('');
   const [scheduledClock, setScheduledClock] = useState('');
   const [uploading, setUploading] = useState(false);
@@ -105,6 +108,12 @@ export default function PostCreator() {
   };
 
   useEffect(() => {
+    return () => {
+      mediaPreviewUrls.forEach((url) => URL.revokeObjectURL(url));
+    };
+  }, [mediaPreviewUrls]);
+
+  useEffect(() => {
     setTargetAccounts((prev) => {
       const next = { ...prev };
       ['twitter', 'linkedin'].forEach((platformId) => {
@@ -171,10 +180,37 @@ export default function PostCreator() {
   const handleFileUpload = async (e) => {
     const files = Array.from(e.target.files);
     if (files.length === 0) return;
+    if (mediaUrls.length + files.length > MAX_MEDIA_FILES) {
+      toast.error(`You can upload up to ${MAX_MEDIA_FILES} files`);
+      e.target.value = '';
+      return;
+    }
+
+    const validFiles = [];
+    for (const file of files) {
+      const isSupportedType = file.type.startsWith('image/') || file.type.startsWith('video/');
+      if (!isSupportedType) {
+        toast.error(`${file.name} is not a supported image or video file`);
+        continue;
+      }
+      if (file.size > MAX_FILE_SIZE_MB * 1024 * 1024) {
+        toast.error(`${file.name} is larger than ${MAX_FILE_SIZE_MB}MB`);
+        continue;
+      }
+      validFiles.push(file);
+    }
+
+    if (validFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    const previewBatch = validFiles.map((file) => URL.createObjectURL(file));
+    setMediaPreviewUrls((prev) => [...prev, ...previewBatch]);
     setUploading(true);
     try {
       const token = localStorage.getItem('access_token');
-      const uploads = files.map(async (file) => {
+      const uploads = validFiles.map(async (file) => {
         const fd = new FormData();
         fd.append('file', file);
         const res = await axios.post(`${API}/upload`, fd, { headers: { Authorization: `Bearer ${token}`, 'Content-Type': 'multipart/form-data' }, withCredentials: true });
@@ -184,10 +220,25 @@ export default function PostCreator() {
       setMediaUrls((prev) => [...prev, ...urls]);
       toast.success('Media uploaded');
     } catch (error) {
+      previewBatch.forEach((url) => URL.revokeObjectURL(url));
+      setMediaPreviewUrls((prev) => prev.filter((url) => !previewBatch.includes(url)));
       toast.error('Failed to upload media');
     } finally {
       setUploading(false);
+      e.target.value = '';
     }
+  };
+
+  const removeMedia = (index) => {
+    setMediaUrls((prev) => prev.filter((_, currentIndex) => currentIndex !== index));
+    setMediaPreviewUrls((prev) => {
+      const next = [...prev];
+      const [removed] = next.splice(index, 1);
+      if (removed) {
+        URL.revokeObjectURL(removed);
+      }
+      return next;
+    });
   };
 
   const improveCaption = async () => {
@@ -432,18 +483,39 @@ export default function PostCreator() {
             {/* Media Upload */}
             <div className="brutal-card p-6">
               <label className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-3 block">Media</label>
-              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center">
+              <div className="border-2 border-dashed border-border rounded-xl p-6 text-center bg-gradient-to-br from-white to-pastel-blue/10">
                 <input type="file" multiple accept="image/*,video/*" onChange={handleFileUpload} className="hidden" id="media-upload" data-testid="media-upload-input" />
                 <label htmlFor="media-upload" className="cursor-pointer">
                   <Upload className="w-10 h-10 mx-auto mb-2 text-text-muted" />
                   <p className="text-sm font-medium text-text-secondary">{uploading ? 'Uploading...' : 'Click to upload'}</p>
+                  <p className="mt-2 text-xs text-text-muted">Images/videos up to {MAX_FILE_SIZE_MB}MB each. Best results with clean PNG or JPG images.</p>
                 </label>
               </div>
               {mediaUrls.length > 0 && (
-                <div className="mt-3 flex gap-2 flex-wrap">
+                <div className="mt-4 grid grid-cols-2 gap-3 sm:grid-cols-3">
                   {mediaUrls.map((url, i) => (
-                    <div key={i} className="w-16 h-16 border-2 border-border rounded-xl overflow-hidden flex items-center justify-center bg-gray-50">
-                      <ImageIcon className="w-6 h-6 text-text-muted" />
+                    <div key={url} className="group relative overflow-hidden rounded-2xl border-2 border-black bg-white shadow-brutalSoft aspect-square">
+                      {mediaPreviewUrls[i] ? (
+                        <img
+                          src={mediaPreviewUrls[i]}
+                          alt={`Uploaded media ${i + 1}`}
+                          className="h-full w-full object-cover"
+                        />
+                      ) : (
+                        <div className="flex h-full w-full items-center justify-center bg-gray-50">
+                          <ImageIcon className="w-8 h-8 text-text-muted" />
+                        </div>
+                      )}
+                      <div className="absolute inset-x-0 bottom-0 bg-black/75 px-2 py-1 text-[10px] font-bold uppercase tracking-wider text-white">
+                        Uploaded
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => removeMedia(i)}
+                        className="absolute right-2 top-2 rounded-full border-2 border-black bg-white/90 px-2 py-1 text-[10px] font-black uppercase tracking-wider text-text-primary transition hover:bg-red-500 hover:text-white"
+                      >
+                        Remove
+                      </button>
                     </div>
                   ))}
                 </div>

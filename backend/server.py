@@ -301,6 +301,15 @@ def to_object_id(value: Any) -> ObjectId:
         return value
     return ObjectId(str(value))
 
+
+def user_id_variants(value: Any) -> List[Any]:
+    variants = [str(value)]
+    try:
+        variants.append(to_object_id(value))
+    except Exception:
+        pass
+    return variants
+
 def create_access_token(user_id: str, email: str) -> str:
     return jwt.encode({"sub": str(user_id), "email": email, "exp": datetime.now(timezone.utc) + timedelta(hours=24), "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -2835,7 +2844,7 @@ class JobPostCreate(BaseModel):
 @api_router.get("/job-posts")
 async def list_job_posts(user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobPosting")
-    posts = await db.job_posts.find({"user_id": user["_id"]}, {"_id": 0}).to_list(100)
+    posts = await db.job_posts.find({"user_id": {"$in": user_id_variants(user["_id"])}}, {"_id": 0}).to_list(100)
     return posts
 
 @api_router.post("/job-posts")
@@ -2867,7 +2876,7 @@ async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_u
         except Exception as e:
             logger.error(f"AI job content error: {e}")
     doc = {
-        "job_id": job_id, "user_id": user["_id"],
+        "job_id": job_id, "user_id": str(user["_id"]),
         "title": job.title, "company": job.company, "location": job.location,
         "description": job.description, "requirements": job.requirements,
         "salary": job.salary, "job_type": job.job_type,
@@ -2883,7 +2892,7 @@ async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_u
 @api_router.post("/job-posts/{job_id}/export")
 async def export_job_post(job_id: str, user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobExport")
-    post = await db.job_posts.find_one({"job_id": job_id, "user_id": user["_id"]})
+    post = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}})
     if not post:
         raise HTTPException(status_code=404, detail="Job post not found")
     export_cost = TOKEN_COSTS["job_export"]
@@ -2897,7 +2906,7 @@ async def export_job_post(job_id: str, user: dict = Depends(get_current_user)):
 @api_router.delete("/job-posts/{job_id}")
 async def delete_job_post(job_id: str, user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobPosting")
-    result = await db.job_posts.delete_one({"job_id": job_id, "user_id": user["_id"]})
+    result = await db.job_posts.delete_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}})
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Job post not found")
     return {"message": "Job post deleted"}
@@ -2908,7 +2917,7 @@ async def delete_job_post(job_id: str, user: dict = Depends(get_current_user)):
 @api_router.get("/job-posts/{job_id}/leads")
 async def get_job_leads(job_id: str, user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobExport")  # Business-only
-    post = await db.job_posts.find_one({"job_id": job_id, "user_id": user["_id"]})
+    post = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}})
     if not post:
         raise HTTPException(status_code=404, detail="Job post not found")
     # Mock leads based on skills/title
@@ -2937,7 +2946,7 @@ async def get_job_leads(job_id: str, user: dict = Depends(get_current_user)):
 @api_router.post("/job-posts/{job_id}/send-outreach")
 async def send_job_outreach(job_id: str, data: dict = Body(...), user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobExport")  # Business-only
-    post = await db.job_posts.find_one({"job_id": job_id, "user_id": user["_id"]})
+    post = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}})
     if not post:
         raise HTTPException(status_code=404, detail="Job post not found")
     lead_ids = data.get("lead_ids", [])
@@ -2946,7 +2955,7 @@ async def send_job_outreach(job_id: str, data: dict = Body(...), user: dict = De
     # Daily cap: 50 messages per user per day
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
     sent_today = await db.job_lead_outreach.count_documents({
-        "user_id": user["_id"],
+        "user_id": {"$in": user_id_variants(user["_id"])},
         "createdAt": {"$gte": today_start.isoformat()}
     })
     daily_cap = 50
@@ -2960,7 +2969,7 @@ async def send_job_outreach(job_id: str, data: dict = Body(...), user: dict = De
     await log_token_usage(user, "outreach", "lead_outreach", outreach_cost)
     # Record outreach
     await db.job_lead_outreach.insert_one({
-        "user_id": user["_id"],
+        "user_id": str(user["_id"]),
         "job_id": job_id,
         "job_title": post.get("title"),
         "company": post.get("company"),
@@ -2984,10 +2993,10 @@ async def get_outreach_stats(user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobExport")
     today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
     sent_today = await db.job_lead_outreach.count_documents({
-        "user_id": user["_id"],
+        "user_id": {"$in": user_id_variants(user["_id"])},
         "createdAt": {"$gte": today_start}
     })
-    total_sent = await db.job_lead_outreach.count_documents({"user_id": user["_id"]})
+    total_sent = await db.job_lead_outreach.count_documents({"user_id": {"$in": user_id_variants(user["_id"])}})
     return {
         "sent_today": sent_today,
         "daily_cap": 50,
