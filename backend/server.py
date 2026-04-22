@@ -29,6 +29,7 @@ import io
 import resend
 import razorpay
 from bson import ObjectId
+from urllib.parse import urlparse, unquote
 
 
 ROOT_DIR = Path(__file__).parent
@@ -50,6 +51,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 APP_NAME = "schedora"
+LINKEDIN_API_VERSION = os.environ.get("LINKEDIN_API_VERSION", "202603")
 
 
 async def ping_database() -> bool:
@@ -65,12 +67,17 @@ def _derive_public_backend_url():
     # Explicit override wins
     if os.environ.get("BACKEND_URL"):
         return os.environ["BACKEND_URL"].rstrip("/")
+    # In single-service deploys, the public frontend domain is often the same host
+    if os.environ.get("FRONTEND_URL"):
+        return os.environ["FRONTEND_URL"].rstrip("/")
+    if os.environ.get("REACT_APP_BACKEND_URL"):
+        return os.environ["REACT_APP_BACKEND_URL"].rstrip("/")
     # In Replit dev, build from REPLIT_DEV_DOMAIN or REPLIT_DOMAINS
     replit_dev = os.environ.get("REPLIT_DEV_DOMAIN") or os.environ.get("REPLIT_DOMAINS", "").split(",")[0].strip()
     if replit_dev:
         return f"https://{replit_dev}"
     # Fallback for production / old deploys
-    return (os.environ.get("REACT_APP_BACKEND_URL") or "https://sechdora.onrender.com").rstrip("/")
+    return "https://schedora.in"
 
 PUBLIC_BACKEND_URL = _derive_public_backend_url()
 
@@ -174,7 +181,7 @@ async def deduct_tokens(user, tokens):
         return False, f"Not enough credits. Need {tokens} credits, you have {current_balance}."
 
     await db.users.update_one(
-        {"_id": user["_id"]},
+        {"_id": to_object_id(user["_id"])},
         {"$inc": {"tokens": -tokens}}
     )
     return True, "Tokens deducted"
@@ -182,7 +189,7 @@ async def deduct_tokens(user, tokens):
 async def log_token_usage(user, action, token_type, tokens):
     """Log token usage for analytics."""
     await db.token_logs.insert_one({
-        "user_id": user["_id"],
+        "user_id": str(user["_id"]),
         "action": action,
         "type": token_type,
         "tokens": tokens,
@@ -288,6 +295,12 @@ def verify_password(plain: str, hashed: str) -> bool:
         logger.error(f"Password verification error: {e}")
         return False
 
+
+def to_object_id(value: Any) -> ObjectId:
+    if isinstance(value, ObjectId):
+        return value
+    return ObjectId(str(value))
+
 def create_access_token(user_id: str, email: str) -> str:
     return jwt.encode({"sub": str(user_id), "email": email, "exp": datetime.now(timezone.utc) + timedelta(hours=24), "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -342,14 +355,25 @@ def normalize_media_url(url: str) -> str:
     url = str(url).strip()
     if not url:
         return ""
+    if url.startswith("http://") or url.startswith("https://"):
+        parsed = urlparse(url)
+        public_host = urlparse(PUBLIC_BACKEND_URL).netloc
+        known_internal_hosts = {
+            public_host,
+            "schedora.in",
+            "www.schedora.in",
+            "sechdora-1.onrender.com",
+            "sechdora.onrender.com",
+        }
+        if parsed.path.startswith("/api/files/") and parsed.netloc in known_internal_hosts:
+            return f"{PUBLIC_BACKEND_URL}{parsed.path}"
+        return url
     if url.startswith("/api/files/"):
         return f"{PUBLIC_BACKEND_URL}{url}"
     if url.startswith("api/files/"):
         return f"{PUBLIC_BACKEND_URL}/{url}"
     if url.startswith("/"):
         return f"{PUBLIC_BACKEND_URL}{url}"
-    if url.startswith("http://") or url.startswith("https://"):
-        return url
     return f"{PUBLIC_BACKEND_URL}/{url}"
 
 
@@ -364,6 +388,87 @@ def normalize_media_urls(values: Any) -> List[str]:
         if url:
             normalized.append(url)
     return normalized[:10]
+
+
+def linkedin_headers(token: str, include_content_type: bool = True, include_version: bool = True) -> Dict[str, str]:
+    headers = {
+        "Authorization": f"Bearer {token}",
+        "X-Restli-Protocol-Version": "2.0.0",
+    }
+    if include_version:
+        headers["Linkedin-Version"] = LINKEDIN_API_VERSION
+    if include_content_type:
+        headers["Content-Type"] = "application/json"
+    return headers
+
+
+async def fetch_media_binary(media_url: str) -> tuple[bytes, str, str]:
+    parsed = urlparse(media_url)
+    path = parsed.path or ""
+
+    if "/api/files/" in path:
+        storage_path = unquote(path.split("/api/files/", 1)[1])
+        data, content_type = await get_object(storage_path)
+        filename = storage_path.rsplit("/", 1)[-1] or "upload"
+        return data, content_type, filename
+
+    resp = requests.get(media_url, timeout=20)
+    resp.raise_for_status()
+    filename = path.rsplit("/", 1)[-1] or "upload"
+    return resp.content, resp.headers.get("Content-Type", "application/octet-stream"), filename
+
+
+async def linkedin_upload_image(token: str, owner_urn: str, media_url: str) -> str:
+    data, content_type, filename = await fetch_media_binary(media_url)
+    if not content_type.startswith("image/"):
+        raise ValueError(f"LinkedIn only supports image uploads here. Got {content_type} for {filename}.")
+
+    init_resp = requests.post(
+        "https://api.linkedin.com/rest/images?action=initializeUpload",
+        json={"initializeUploadRequest": {"owner": owner_urn}},
+        headers=linkedin_headers(token),
+        timeout=20,
+    )
+    if init_resp.status_code != 200:
+        raise RuntimeError(f"LinkedIn image initialize failed: {init_resp.status_code} {init_resp.text}")
+
+    init_data = init_resp.json().get("value", {})
+    upload_url = init_data.get("uploadUrl")
+    image_urn = init_data.get("image")
+    if not upload_url or not image_urn:
+        raise RuntimeError(f"LinkedIn image initialize returned unexpected payload: {init_resp.text}")
+
+    upload_resp = requests.put(
+        upload_url,
+        data=data,
+        headers={
+            "Authorization": f"Bearer {token}",
+            "Content-Type": content_type,
+        },
+        timeout=60,
+    )
+    if upload_resp.status_code not in (200, 201, 202):
+        raise RuntimeError(f"LinkedIn image upload failed: {upload_resp.status_code} {upload_resp.text}")
+
+    for _ in range(10):
+        status_resp = requests.get(
+            f"https://api.linkedin.com/rest/images/{requests.utils.quote(image_urn, safe='')}",
+            headers=linkedin_headers(token, include_content_type=False),
+            timeout=15,
+        )
+        if status_resp.status_code == 200:
+            status = status_resp.json().get("status")
+            if status == "AVAILABLE":
+                return image_urn
+            if status == "PROCESSING_FAILED":
+                raise RuntimeError(f"LinkedIn image processing failed for {filename}.")
+        elif status_resp.status_code == 403:
+            # Some member-only tokens cannot read versioned rest/images even after upload.
+            await asyncio.sleep(2)
+            return image_urn
+        await asyncio.sleep(2)
+
+    return image_urn
 
 
 # ─── Plan Helpers ─────────────────────────────────────────────────────────────
@@ -1949,43 +2054,65 @@ async def publish_to_twitter(account: dict, content: str, media_urls: list = Non
         return {"status": "failed", "error": f"Twitter API error {resp.status_code}: {error_body}"}
 
 async def publish_to_linkedin(account: dict, content: str, media_urls: list = None):
-    """Post to LinkedIn using UGC API."""
+    """Post to LinkedIn using the Posts API with optional image upload."""
     token = account["access_token"]
     author_id = account["platform_user_id"]
     if not token or not author_id:
         return {"status": "failed", "error": "LinkedIn account is missing authorization details. Reconnect this account."}
-    
-    url = "https://api.linkedin.com/v2/ugcPosts"
-    headers = {
-        "Authorization": f"Bearer {token}",
-        "Content-Type": "application/json",
-        "X-Restli-Protocol-Version": "2.0.0"
-    }
-    
+
+    author_urn = f"urn:li:person:{author_id}"
+    media_urls = normalize_media_urls(media_urls or [])
     payload = {
-        "author": f"urn:li:person:{author_id}",
-        "lifecycleState": "PUBLISHED",
-        "specificContent": {
-            "com.linkedin.ugc.ShareContent": {
-                "shareCommentary": {"text": content},
-                "shareMediaCategory": "NONE"
-            }
+        "author": author_urn,
+        "commentary": content,
+        "visibility": "PUBLIC",
+        "distribution": {
+            "feedDistribution": "MAIN_FEED",
+            "targetEntities": [],
+            "thirdPartyDistributionChannels": []
         },
-        "visibility": {"com.linkedin.ugc.MemberNetworkVisibility": "PUBLIC"}
+        "lifecycleState": "PUBLISHED",
+        "isReshareDisabledByAuthor": False
     }
-    
-    resp = requests.post(url, json=payload, headers=headers, timeout=15)
-    
+
+    if media_urls:
+        image_url = media_urls[0]
+        try:
+            image_urn = await linkedin_upload_image(token, author_urn, image_url)
+            payload["content"] = {
+                "media": {
+                    "id": image_urn
+                }
+            }
+        except Exception as exc:
+            logger.error(f"LinkedIn image upload failed for account {account.get('account_id')}: {exc}", exc_info=True)
+            return {"status": "failed", "error": f"LinkedIn image upload failed: {exc}"}
+
+    url = "https://api.linkedin.com/rest/posts"
+    headers = linkedin_headers(token)
+    resp = requests.post(url, json=payload, headers=headers, timeout=20)
+
     if resp.status_code == 401:
         new_token = await refresh_social_token("linkedin", account)
         if new_token:
-            headers["Authorization"] = f"Bearer {new_token}"
+            headers = linkedin_headers(new_token)
             resp = requests.post(url, json=payload, headers=headers, timeout=15)
-            
+
     if resp.status_code in [200, 201]:
-        return {"status": "success", "platform_post_id": resp.json().get("id")}
+        platform_post_id = resp.headers.get("x-restli-id")
+        if not platform_post_id:
+            try:
+                platform_post_id = resp.json().get("id")
+            except Exception:
+                platform_post_id = None
+        return {"status": "success", "platform_post_id": platform_post_id}
     else:
-        return {"status": "failed", "error": resp.text}
+        try:
+            error_body = resp.json()
+        except Exception:
+            error_body = resp.text
+        logger.error(f"LinkedIn publish failed for account {account.get('account_id')}: {resp.status_code} {error_body}")
+        return {"status": "failed", "error": f"LinkedIn API error {resp.status_code}: {error_body}"}
 
 async def publish_recurring_post(post_id: str):
     """Publish a recurring post by cloning it."""
@@ -2721,7 +2848,9 @@ async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_u
     if not ok:
         raise HTTPException(status_code=402, detail=msg)
     await log_token_usage(user, "job_generation", "job_generation", job_cost)
-    user = await db.users.find_one({"_id": user["_id"]})
+    user = await db.users.find_one({"_id": to_object_id(user["_id"])})
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
 
     job_id = f"job_{uuid.uuid4().hex[:12]}"
     content = f"{job.title} at {job.company}\n\n{job.description}"
