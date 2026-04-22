@@ -15,6 +15,7 @@ import {
   FileSpreadsheet,
   RefreshCw,
   Users,
+  Send,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import UpgradeModal from "@/components/UpgradeModal";
@@ -142,6 +143,7 @@ export default function JobPosts() {
   const [bulkUploading, setBulkUploading] = useState(false);
   const [bulkCsvName, setBulkCsvName] = useState("");
   const [upgradeModal, setUpgradeModal] = useState({ open: false, message: "" });
+  const [publishingLinkedInId, setPublishingLinkedInId] = useState(null);
 
   const [form, setForm] = useState(createEmptyJobForm());
 
@@ -355,6 +357,20 @@ export default function JobPosts() {
     }
   };
 
+  const handlePublishLinkedIn = async (job) => {
+    setPublishingLinkedInId(job.job_id);
+    try {
+      const res = await axios.post(`${API}/job-posts/${job.job_id}/publish-linkedin`, {}, { headers });
+      toast.success(res.data.message || "Published to LinkedIn");
+      await fetchAll(true);
+    } catch (err) {
+      const detail = err.response?.data?.detail;
+      toast.error(typeof detail === "string" ? detail : "LinkedIn publish failed");
+    } finally {
+      setPublishingLinkedInId(null);
+    }
+  };
+
   const addSkillToForm = () => {
     const value = form.skillInput.trim();
     if (!value || form.skills.includes(value)) return;
@@ -525,7 +541,11 @@ export default function JobPosts() {
           )}
 
           {showForm && !isLocked && (
-            <div className="mb-8 rounded-2xl border-4 border-black bg-white p-6 shadow-brutal">
+            <section className="mb-8 rounded-2xl border-4 border-black bg-white p-6 shadow-brutal">
+              <div className="mb-4">
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-text-muted">Section 1</div>
+                <div className="text-2xl font-black">Create Or Edit Job Post</div>
+              </div>
               <h2 className="mb-4 flex items-center gap-2 text-xl font-black">
                 {editingJobId ? <Pencil className="w-5 h-5" strokeWidth={3} /> : <Plus className="w-5 h-5" strokeWidth={3} />}
                 {editingJobId ? "Edit Job Post" : "Create Job Post"}
@@ -593,11 +613,15 @@ export default function JobPosts() {
                   </button>
                 </div>
               </form>
-            </div>
+            </section>
           )}
 
           {showBulkPanel && !isLocked && (
-            <div className="mb-8 rounded-2xl border-4 border-black bg-white p-6 shadow-brutal">
+            <section className="mb-8 rounded-2xl border-4 border-black bg-white p-6 shadow-brutal">
+              <div className="mb-4">
+                <div className="text-xs font-black uppercase tracking-[0.2em] text-text-muted">Section 2</div>
+                <div className="text-2xl font-black">Bulk Import</div>
+              </div>
               <div className="mb-4 flex items-center justify-between gap-4">
                 <h2 className="text-xl font-black">Bulk Job Upload</h2>
                 <div className="flex gap-2">
@@ -671,7 +695,7 @@ export default function JobPosts() {
                   {bulkCsvName && <p className="mt-3 text-sm font-bold">Selected: {bulkCsvName}</p>}
                 </div>
               )}
-            </div>
+            </section>
           )}
 
           {!isLocked && (
@@ -685,7 +709,12 @@ export default function JobPosts() {
                   <p className="text-text-secondary">Create one job or import many at once.</p>
                 </div>
               ) : (
-                <div className="space-y-5">
+                <section className="space-y-5">
+                  <div className="mb-1">
+                    <div className="text-xs font-black uppercase tracking-[0.2em] text-text-muted">Section 3</div>
+                    <div className="text-2xl font-black">Job Library</div>
+                    <p className="mt-1 text-sm text-text-secondary">Each card keeps creation, publishing, export, and outreach actions separate.</p>
+                  </div>
                   {jobs.map((job) => (
                     <div key={job.job_id} className="rounded-2xl border-4 border-black bg-white p-5 shadow-brutal">
                       <div className="mb-4 flex items-start justify-between gap-3">
@@ -705,6 +734,24 @@ export default function JobPosts() {
                           </button>
                           <button onClick={() => handleCopy(job.generated_content)} className="rounded-lg border-2 border-black p-2 hover:bg-black hover:text-white" title="Copy">
                             <Copy className="w-4 h-4" strokeWidth={3} />
+                          </button>
+                          <button
+                            onClick={() => handlePublishLinkedIn(job)}
+                            disabled={publishingLinkedInId === job.job_id}
+                            className="rounded-lg border-2 border-black bg-[#e8f2ff] px-3 py-2 text-xs font-black uppercase tracking-wider hover:bg-black hover:text-white disabled:opacity-50"
+                            title="Publish this job post to connected LinkedIn"
+                          >
+                            {publishingLinkedInId === job.job_id ? (
+                              <span className="inline-flex items-center gap-2">
+                                <Loader2 className="w-3 h-3 animate-spin" />
+                                Publishing
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-2">
+                                <Send className="w-3 h-3" />
+                                Post to LinkedIn
+                              </span>
+                            )}
                           </button>
                           <button onClick={() => handleExport(job)} className={`rounded-lg border-2 border-black p-2 ${planInfo?.plan?.jobExport ? "hover:bg-black hover:text-white" : "opacity-40"}`} title="Export">
                             <Download className="w-4 h-4" strokeWidth={3} />
@@ -742,12 +789,13 @@ export default function JobPosts() {
                             <div className="mb-1 text-xs font-black uppercase tracking-widest text-text-muted">Credits</div>
                             <p className="text-sm font-bold">Generation used: {job.tokens_used || 0} credits</p>
                             <p className="text-sm font-bold">Candidate outreach: {OUTREACH_BATCH_COST} credits per batch</p>
+                            <p className="mt-1 text-xs text-text-muted">Use "Post to LinkedIn" for real publishing. Use "Find Candidates" for the outreach workflow.</p>
                           </div>
                         </div>
                       </div>
                     </div>
                   ))}
-                </div>
+                </section>
               )}
             </>
           )}
@@ -780,6 +828,7 @@ export default function JobPosts() {
                 <>
                   <p className="mb-4 text-sm font-bold text-text-secondary">
                     Candidate outreach uses <span className="text-primary">{OUTREACH_BATCH_COST} credits</span> per batch, no matter how many leads you choose.
+                    <span className="block mt-1">This workflow is separate from publishing the job to your LinkedIn feed.</span>
                   </p>
                   <div className="space-y-2">
                     {leads.map((lead) => (

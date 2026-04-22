@@ -331,6 +331,16 @@ def user_id_variants(value: Any) -> List[Any]:
         pass
     return variants
 
+
+def bson_safe(value: Any) -> Any:
+    if isinstance(value, ObjectId):
+        return str(value)
+    if isinstance(value, list):
+        return [bson_safe(item) for item in value]
+    if isinstance(value, dict):
+        return {key: bson_safe(item) for key, item in value.items()}
+    return value
+
 def create_access_token(user_id: str, email: str) -> str:
     return jwt.encode({"sub": str(user_id), "email": email, "exp": datetime.now(timezone.utc) + timedelta(hours=24), "type": "access"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
@@ -3164,7 +3174,7 @@ async def build_job_post_doc(job: JobPostCreate, user: dict, job_cost: int, char
 async def list_job_posts(user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobPosting")
     posts = await db.job_posts.find({"user_id": {"$in": user_id_variants(user["_id"])}}, {"_id": 0}).to_list(100)
-    return posts
+    return [bson_safe(post) for post in posts]
 
 @api_router.post("/job-posts")
 async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_user)):
@@ -3175,7 +3185,7 @@ async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_u
     doc = await build_job_post_doc(job, user, job_cost, charge_tokens=True)
     await db.job_posts.insert_one(doc)
     doc.pop("_id", None)
-    return doc
+    return bson_safe(doc)
 
 
 @api_router.post("/job-posts/bulk-create")
@@ -3191,7 +3201,7 @@ async def bulk_create_job_posts(data: JobPostBulk, user: dict = Depends(get_curr
             doc = await build_job_post_doc(job, user, TOKEN_COSTS["job_generation"], charge_tokens=True)
             await db.job_posts.insert_one(doc)
             doc.pop("_id", None)
-            created.append(doc)
+            created.append(bson_safe(doc))
         except HTTPException as exc:
             errors.append(f"Row {idx}: {exc.detail}")
         except Exception as exc:
@@ -3240,7 +3250,39 @@ async def update_job_post(job_id: str, job: JobPostCreate, user: dict = Depends(
         {"$set": updated_doc}
     )
     refreshed = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}}, {"_id": 0})
-    return refreshed
+    return bson_safe(refreshed)
+
+
+@api_router.post("/job-posts/{job_id}/publish-linkedin")
+async def publish_job_post_to_linkedin(job_id: str, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobPosting")
+    post = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}})
+    if not post:
+        raise HTTPException(status_code=404, detail="Job post not found")
+
+    account = await db.social_accounts.find_one({
+        "user_id": {"$in": user_id_variants(user["_id"])},
+        "platform": "linkedin",
+        "status": "connected"
+    }, {"_id": 0})
+    if not account:
+        raise HTTPException(status_code=400, detail="Connect a LinkedIn account first")
+
+    result = await publish_to_linkedin(account, post.get("generated_content", ""), [])
+    if result.get("status") != "success":
+        raise HTTPException(status_code=400, detail=result.get("error", "LinkedIn publish failed"))
+
+    await db.job_posts.update_one(
+        {"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}},
+        {"$set": {
+            "linkedin_post_id": result.get("platform_post_id"),
+            "linkedin_published_at": datetime.now(timezone.utc).isoformat(),
+        }}
+    )
+    return {
+        "message": "Job post published to LinkedIn",
+        "platform_post_id": result.get("platform_post_id"),
+    }
 
 
 @api_router.post("/job-posts/{job_id}/export")
