@@ -1,24 +1,14 @@
-from redis import Redis
-from rq import Queue
-import os
-from datetime import timedelta
+import asyncio
+from server import logger, db, publish_post
 
-redis_url = os.getenv('REDIS_URL', 'redis://localhost:6379')
-redis_conn = Redis.from_url(redis_url)
+async def enqueue_publish(post_id: str):
+    """Enqueue post for publishing."""
+    logger.info(f"Enqueuing post {post_id} for publish")
+    asyncio.create_task(publish_post(post_id))
 
-publish_queue = Queue('publish', connection=redis_conn)
-retry_queue = Queue('retry', connection=redis_conn)
+async def enqueue_retry(post_id: str, delay_seconds: int):
+    """Enqueue post retry with delay."""
+    logger.info(f"Scheduling retry for post {post_id} in {delay_seconds}s")
+    await asyncio.sleep(delay_seconds)
+    asyncio.create_task(publish_post(post_id))
 
-def enqueue_publish(post_id):
-    publish_queue.enqueue(publish_worker, post_id)
-
-def enqueue_retry(post_id, delay_seconds):
-    retry_queue.enqueue_in(timedelta(seconds=delay_seconds), retry_worker, post_id)
-
-async def publish_worker(post_id):
-    from server import publish_post
-    await publish_post(post_id)
-
-async def retry_worker(post_id):
-    from server import publish_post
-    await publish_post(post_id)
