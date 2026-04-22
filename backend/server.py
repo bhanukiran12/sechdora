@@ -1,5 +1,5 @@
 from fastapi import FastAPI, APIRouter, HTTPException, Header, File, UploadFile, Response, Query, Depends, Request, Body
-from fastapi.responses import JSONResponse
+from fastapi.responses import JSONResponse, StreamingResponse
 from dotenv import load_dotenv
 from starlette.middleware.cors import CORSMiddleware
 import aiosmtplib
@@ -52,6 +52,7 @@ if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 APP_NAME = "schedora"
 LINKEDIN_API_VERSION = os.environ.get("LINKEDIN_API_VERSION", "202603")
+_realtime_subscribers: Dict[str, List[asyncio.Queue]] = {}
 
 
 async def ping_database() -> bool:
@@ -61,6 +62,26 @@ async def ping_database() -> bool:
     except Exception as exc:
         logger.error(f"MongoDB ping failed: {exc}", exc_info=True)
         return False
+
+
+async def publish_realtime_event(user_id: Any, event_type: str, payload: Optional[Dict[str, Any]] = None) -> None:
+    uid = str(user_id)
+    subscribers = _realtime_subscribers.get(uid, [])
+    if not subscribers:
+        return
+    event = {
+        "type": event_type,
+        "payload": payload or {},
+        "timestamp": datetime.now(timezone.utc).isoformat(),
+    }
+    dead = []
+    for queue in subscribers:
+        try:
+            queue.put_nowait(event)
+        except asyncio.QueueFull:
+            dead.append(queue)
+    if dead:
+        _realtime_subscribers[uid] = [queue for queue in subscribers if queue not in dead]
 
 
 def _derive_public_backend_url():
@@ -316,12 +337,19 @@ def create_access_token(user_id: str, email: str) -> str:
 def create_refresh_token(user_id: str) -> str:
     return jwt.encode({"sub": str(user_id), "exp": datetime.now(timezone.utc) + timedelta(days=7), "type": "refresh"}, JWT_SECRET, algorithm=JWT_ALGORITHM)
 
-async def get_current_user(request: Request) -> dict:
+def extract_bearer_token(request: Request, auth: Optional[str] = None) -> Optional[str]:
     token = request.cookies.get("access_token")
-    if not token:
-        auth_header = request.headers.get("Authorization", "")
-        if auth_header.startswith("Bearer "):
-            token = auth_header[7:]
+    if token:
+        return token
+    auth_header = request.headers.get("Authorization", "")
+    if auth_header.startswith("Bearer "):
+        return auth_header[7:]
+    if auth:
+        return auth
+    return None
+
+
+async def get_current_user_from_token(token: str) -> dict:
     if not token:
         raise HTTPException(status_code=401, detail="Not authenticated")
     try:
@@ -340,6 +368,11 @@ async def get_current_user(request: Request) -> dict:
         raise HTTPException(status_code=401, detail="Token expired")
     except jwt.InvalidTokenError:
         raise HTTPException(status_code=401, detail="Invalid token")
+
+
+async def get_current_user(request: Request) -> dict:
+    token = extract_bearer_token(request)
+    return await get_current_user_from_token(token)
 
 async def put_object(path: str, data: bytes, content_type: str) -> dict:
     grid_in = fs.open_upload_stream(path, metadata={"contentType": content_type})
@@ -409,6 +442,147 @@ def linkedin_headers(token: str, include_content_type: bool = True, include_vers
     if include_content_type:
         headers["Content-Type"] = "application/json"
     return headers
+
+
+def normalize_linkedin_share_urn(platform_post_id: str) -> str:
+    if not platform_post_id:
+        return ""
+    value = unquote(str(platform_post_id))
+    if value.startswith("urn:li:"):
+        return value
+    if value.startswith("share:") or value.startswith("ugcPost:"):
+        return f"urn:li:{value}"
+    if value.isdigit():
+        return f"urn:li:share:{value}"
+    return value
+
+
+async def fetch_x_post_metrics(account: dict, platform_post_id: str) -> Dict[str, int]:
+    token = account.get("access_token")
+    if not token or not platform_post_id:
+        return {}
+    resp = requests.get(
+        f"https://api.x.com/2/tweets/{platform_post_id}",
+        params={"tweet.fields": "public_metrics,organic_metrics"},
+        headers={"Authorization": f"Bearer {token}"},
+        timeout=20,
+    )
+    if resp.status_code == 401:
+        new_token = await refresh_social_token("twitter", account)
+        if new_token:
+            resp = requests.get(
+                f"https://api.x.com/2/tweets/{platform_post_id}",
+                params={"tweet.fields": "public_metrics,organic_metrics"},
+                headers={"Authorization": f"Bearer {new_token}"},
+                timeout=20,
+            )
+    if resp.status_code != 200:
+        raise RuntimeError(f"X metrics fetch failed: {resp.status_code} {resp.text}")
+
+    tweet = resp.json().get("data", {})
+    public_metrics = tweet.get("public_metrics", {})
+    organic_metrics = tweet.get("organic_metrics", {})
+    likes = int(public_metrics.get("like_count", 0) or 0)
+    comments = int(public_metrics.get("reply_count", 0) or 0)
+    shares = int(public_metrics.get("retweet_count", 0) or 0) + int(public_metrics.get("quote_count", 0) or 0)
+    impressions = int(organic_metrics.get("impression_count", 0) or 0)
+    total_engagement = likes + comments + shares
+    engagement_rate = round((total_engagement / impressions) * 100, 2) if impressions else 0
+    return {
+        "impressions": impressions,
+        "likes": likes,
+        "comments": comments,
+        "shares": shares,
+        "engagement_rate": engagement_rate,
+    }
+
+
+async def fetch_linkedin_post_metrics(account: dict, platform_post_id: str) -> Dict[str, int]:
+    token = account.get("access_token")
+    share_urn = normalize_linkedin_share_urn(platform_post_id)
+    if not token or not share_urn:
+        return {}
+    encoded_urn = requests.utils.quote(share_urn, safe="")
+    resp = requests.get(
+        f"https://api.linkedin.com/rest/socialMetadata/{encoded_urn}",
+        headers=linkedin_headers(token, include_content_type=False),
+        timeout=20,
+    )
+    if resp.status_code == 401:
+        new_token = await refresh_social_token("linkedin", account)
+        if new_token:
+            resp = requests.get(
+                f"https://api.linkedin.com/rest/socialMetadata/{encoded_urn}",
+                headers=linkedin_headers(new_token, include_content_type=False),
+                timeout=20,
+            )
+    if resp.status_code != 200:
+        raise RuntimeError(f"LinkedIn metrics fetch failed: {resp.status_code} {resp.text}")
+
+    data = resp.json()
+    reactions = sum(int(summary.get("count", 0) or 0) for summary in (data.get("reactionSummaries") or {}).values())
+    comments = int((data.get("commentSummary") or {}).get("count", 0) or 0)
+    shares = int((data.get("shareSummary") or {}).get("shareCount", 0) or 0)
+    return {
+        "impressions": 0,
+        "likes": reactions,
+        "comments": comments,
+        "shares": shares,
+        "engagement_rate": 0,
+    }
+
+
+async def fetch_live_post_metrics(platform: str, account: dict, platform_post_id: str) -> Dict[str, int]:
+    if platform == "twitter":
+        return await fetch_x_post_metrics(account, platform_post_id)
+    if platform == "linkedin":
+        return await fetch_linkedin_post_metrics(account, platform_post_id)
+    return {}
+
+
+async def sync_live_metrics_for_user(user_id: Any) -> bool:
+    account_map = {
+        account["account_id"]: account
+        for account in await db.social_accounts.find({"user_id": {"$in": user_id_variants(user_id)}}, {"_id": 0}).to_list(100)
+    }
+    cutoff = datetime.now(timezone.utc) - timedelta(minutes=10)
+    analytics_rows = await db.analytics.find({
+        "user_id": str(user_id),
+        "platform": {"$in": ["twitter", "linkedin"]},
+        "platform_post_id": {"$exists": True, "$ne": None},
+        "$or": [
+            {"metrics_synced_at": {"$exists": False}},
+            {"metrics_synced_at": {"$lt": cutoff.isoformat()}}
+        ]
+    }).sort("created_at", -1).limit(20).to_list(20)
+
+    changed = False
+    for row in analytics_rows:
+        account = account_map.get(row.get("account_id"))
+        if not account:
+            continue
+        try:
+            metrics = await fetch_live_post_metrics(row.get("platform"), account, row.get("platform_post_id"))
+            if not metrics:
+                continue
+            await db.analytics.update_one(
+                {"post_id": row.get("post_id"), "platform": row.get("platform"), "account_id": row.get("account_id")},
+                {"$set": {
+                    **metrics,
+                    "metrics_source": "platform_api",
+                    "metrics_synced_at": datetime.now(timezone.utc).isoformat(),
+                }}
+            )
+            changed = True
+        except Exception as exc:
+            logger.error(f"Metrics sync failed for {row.get('platform')}:{row.get('platform_post_id')}: {exc}")
+            await db.analytics.update_one(
+                {"post_id": row.get("post_id"), "platform": row.get("platform"), "account_id": row.get("account_id")},
+                {"$set": {"metrics_sync_error": str(exc), "metrics_synced_at": datetime.now(timezone.utc).isoformat()}}
+            )
+    if changed:
+        await publish_realtime_event(user_id, "analytics.updated", {"source": "metrics_sync"})
+    return changed
 
 
 async def fetch_media_binary(media_url: str) -> tuple[bytes, str, str]:
@@ -665,11 +839,17 @@ async def send_otp_email(to: str, otp: str):
 
 # ========== NOTIFICATION & AUDIT ==========
 async def create_notification(user_id: str, ntype: str, title: str, message: str, post_id: str = None):
-    await db.notifications.insert_one({
+    notification = {
         "notification_id": f"notif_{uuid.uuid4().hex[:12]}",
         "user_id": user_id, "type": ntype, "title": title,
         "message": message, "post_id": post_id, "read": False,
         "created_at": datetime.now(timezone.utc).isoformat()
+    }
+    await db.notifications.insert_one(notification)
+    await publish_realtime_event(user_id, "notifications.updated", {
+        "notification_id": notification["notification_id"],
+        "post_id": post_id,
+        "title": title,
     })
 
 async def log_audit(user_id: str, action: str, resource_type: str, resource_id: str, details: dict = None):
@@ -1746,9 +1926,10 @@ async def optimize_post(request: dict, user: dict = Depends(get_current_user)):
 # ========== ANALYTICS ==========
 @api_router.get("/analytics/overview")
 async def get_analytics_overview(user: dict = Depends(get_current_user)):
-    query = {"user_id": user["_id"]}
+    await sync_live_metrics_for_user(user["_id"])
+    query = {"user_id": {"$in": user_id_variants(user["_id"])}}
     all_posts = await db.posts.find(query, {"_id": 0}).to_list(1000)
-    analytics = await db.analytics.find(query, {"_id": 0}).to_list(1000)
+    analytics = await db.analytics.find({"user_id": str(user["_id"])}, {"_id": 0}).to_list(1000)
 
     now = datetime.now(timezone.utc)
     current_week_start = now - timedelta(days=7)
@@ -1772,7 +1953,7 @@ async def get_analytics_overview(user: dict = Depends(get_current_user)):
     published_posts = sum(1 for post in all_posts if post.get("status") == "published")
     scheduled_posts = sum(1 for post in all_posts if post.get("status") == "scheduled")
     draft_posts = sum(1 for post in all_posts if post.get("status") == "draft")
-    connected_accounts = await db.social_accounts.count_documents({"user_id": user["_id"], "status": "connected"})
+    connected_accounts = await db.social_accounts.count_documents({"user_id": {"$in": user_id_variants(user["_id"])}, "status": "connected"})
     total_impressions = sum(int(a.get("impressions", 0) or 0) for a in analytics)
     total_engagement = sum(int(a.get("likes", 0) or 0) + int(a.get("comments", 0) or 0) + int(a.get("shares", 0) or 0) for a in analytics)
     avg_engagement_rate = sum(a.get("engagement_rate", 0) for a in analytics) / len(analytics) if analytics else 0
@@ -1816,6 +1997,47 @@ async def get_analytics_overview(user: dict = Depends(get_current_user)):
         direction = "+" if delta >= 0 else ""
         return f"{direction}{round(delta, 0)}% this week"
 
+    insights = []
+    if total_posts == 0:
+        insights.append("No post history yet. Publish a few posts to unlock pattern-based insights.")
+    else:
+        insights.append(f"You have created {total_posts} posts so far, with {published_posts} already published.")
+        if draft_posts > 0:
+            insights.append(f"{draft_posts} posts are still in draft. Publishing them will make the dashboard more useful.")
+        if scheduled_posts > 0:
+            insights.append(f"{scheduled_posts} posts are currently scheduled and should update automatically as they publish.")
+        if connected_accounts == 0:
+            insights.append("Connect at least one social account to publish directly and collect live publish events.")
+
+    if analytics:
+        top_platform = max(platform_stats.items(), key=lambda item: item[1].get("posts", 0))[0] if platform_stats else None
+        if top_platform:
+            insights.append(f"{top_platform.title()} is currently your busiest publishing channel based on stored post history.")
+    else:
+        insights.append("Detailed engagement metrics will appear after successful platform publishes are recorded.")
+
+    hour_counts: Dict[int, int] = {}
+    for post in all_posts:
+        source_time = post.get("published_at") or post.get("scheduled_time") or post.get("created_at")
+        dt = parse_iso_datetime(source_time)
+        if not dt:
+            continue
+        hour_counts[dt.hour] = hour_counts.get(dt.hour, 0) + 1
+
+    best_times = []
+    for hour, count in sorted(hour_counts.items(), key=lambda item: item[1], reverse=True)[:3]:
+        label = datetime(2000, 1, 1, hour, 0).strftime("%I:%M %p").lstrip("0")
+        best_times.append({
+            "label": label,
+            "count": count,
+            "note": f"{count} scheduled/published post{'s' if count != 1 else ''} around this hour"
+        })
+
+    if not best_times:
+        best_times = [
+            {"label": "No data", "count": 0, "note": "Publish posts to discover real timing patterns"}
+        ]
+
     return {
         "total_posts": total_posts,
         "published_posts": published_posts,
@@ -1833,12 +2055,8 @@ async def get_analytics_overview(user: dict = Depends(get_current_user)):
             "engagement": percent_change(engagement_current, engagement_previous),
             "avg_rate": "Live" if analytics else "No data"
         },
-        "insights": [
-            "Posts with questions get 40% more engagement",
-            "Best posting time: 9-11 AM on weekdays",
-            "Short captions (< 150 chars) perform better",
-            "Video content gets 3x more shares than images"
-        ]
+        "insights": insights,
+        "best_times": best_times
     }
 
 @api_router.get("/analytics/posts/{post_id}")
@@ -1867,14 +2085,47 @@ async def export_analytics(format: str = "csv", user: dict = Depends(get_current
 async def get_notifications(user: dict = Depends(get_current_user)):
     return await db.notifications.find({"user_id": user["_id"]}, {"_id": 0}).sort("created_at", -1).limit(50).to_list(50)
 
+
+@api_router.get("/events/stream")
+async def stream_events(request: Request, auth: Optional[str] = Query(None)):
+    token = extract_bearer_token(request, auth)
+    user = await get_current_user_from_token(token)
+    user_id = str(user["_id"])
+    queue: asyncio.Queue = asyncio.Queue(maxsize=100)
+    _realtime_subscribers.setdefault(user_id, []).append(queue)
+
+    async def event_generator():
+        try:
+            yield f"event: connected\ndata: {JSONResponse(content={'type': 'connected'}).body.decode()}\n\n"
+            while True:
+                if await request.is_disconnected():
+                    break
+                try:
+                    event = await asyncio.wait_for(queue.get(), timeout=20)
+                    yield f"event: {event['type']}\ndata: {JSONResponse(content=event).body.decode()}\n\n"
+                except asyncio.TimeoutError:
+                    heartbeat = {"type": "heartbeat", "timestamp": datetime.now(timezone.utc).isoformat()}
+                    yield f"event: heartbeat\ndata: {JSONResponse(content=heartbeat).body.decode()}\n\n"
+        finally:
+            subscribers = _realtime_subscribers.get(user_id, [])
+            _realtime_subscribers[user_id] = [subscriber for subscriber in subscribers if subscriber is not queue]
+
+    return StreamingResponse(event_generator(), media_type="text/event-stream", headers={
+        "Cache-Control": "no-cache",
+        "Connection": "keep-alive",
+        "X-Accel-Buffering": "no",
+    })
+
 @api_router.post("/notifications/{notification_id}/read")
 async def mark_notification_read(notification_id: str, user: dict = Depends(get_current_user)):
     await db.notifications.update_one({"notification_id": notification_id, "user_id": user["_id"]}, {"$set": {"read": True}})
+    await publish_realtime_event(user["_id"], "notifications.updated", {"notification_id": notification_id})
     return {"message": "Notification marked as read"}
 
 @api_router.post("/notifications/read-all")
 async def mark_all_notifications_read(user: dict = Depends(get_current_user)):
     await db.notifications.update_many({"user_id": user["_id"], "read": False}, {"$set": {"read": True}})
+    await publish_realtime_event(user["_id"], "notifications.updated", {"all_read": True})
     return {"message": "All notifications marked as read"}
 
 @api_router.get("/notifications/unread-count")
@@ -2841,6 +3092,74 @@ class JobPostCreate(BaseModel):
     salary: Optional[str] = ""
     job_type: Optional[str] = "Full-time"
 
+
+class JobPostBulk(BaseModel):
+    jobs: List[JobPostCreate]
+
+
+def validate_job_post_payload(job: JobPostCreate) -> None:
+    required_fields = {
+        "title": job.title,
+        "company": job.company,
+        "location": job.location,
+        "description": job.description,
+        "salary": job.salary,
+        "job_type": job.job_type,
+    }
+    missing = [label for label, value in required_fields.items() if not str(value or "").strip()]
+    if missing:
+        pretty = ", ".join(field.replace("_", " ") for field in missing)
+        raise HTTPException(status_code=400, detail=f"Missing required job fields: {pretty}")
+    cleaned_requirements = [str(item).strip() for item in (job.requirements or []) if str(item).strip()]
+    if not cleaned_requirements:
+        raise HTTPException(status_code=400, detail="At least one skill or requirement is required")
+    job.requirements = cleaned_requirements
+
+
+async def build_job_post_doc(job: JobPostCreate, user: dict, job_cost: int, charge_tokens: bool = True) -> dict:
+    validate_job_post_payload(job)
+    if charge_tokens:
+        ok, msg = await deduct_tokens(user, job_cost)
+        if not ok:
+            raise HTTPException(status_code=402, detail=msg)
+        await log_token_usage(user, "job_generation", "job_generation", job_cost)
+
+    db_user = await db.users.find_one({"_id": to_object_id(user["_id"])})
+    if not db_user:
+        raise HTTPException(status_code=404, detail="User not found")
+
+    job_id = f"job_{uuid.uuid4().hex[:12]}"
+    content = f"{job.title} at {job.company}\n\n{job.description}"
+    if get_plan(db_user)["aiEnabled"] and GEMINI_API_KEY:
+        try:
+            model = genai.GenerativeModel("gemini-1.5-flash")
+            prompt = (f"Write a compelling social media job post for: {job.title} at {job.company}. "
+                      f"Location: {job.location or 'Remote'}. Type: {job.job_type}. "
+                      f"Salary: {job.salary or 'Competitive'}. "
+                      f"Requirements: {', '.join(job.requirements) if job.requirements else job.description}. "
+                      f"Keep it concise, engaging and under 280 words.")
+            response = model.generate_content(prompt)
+            content = response.text
+        except Exception as e:
+            logger.error(f"AI job content error: {e}")
+
+    return {
+        "job_id": job_id,
+        "user_id": str(db_user["_id"]),
+        "title": job.title.strip(),
+        "company": job.company.strip(),
+        "location": job.location.strip(),
+        "description": job.description.strip(),
+        "requirements": job.requirements,
+        "salary": job.salary.strip(),
+        "job_type": job.job_type.strip(),
+        "generated_content": content,
+        "can_export": get_plan(db_user)["jobExport"],
+        "tokens_used": job_cost if charge_tokens else 0,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+
 @api_router.get("/job-posts")
 async def list_job_posts(user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobPosting")
@@ -2853,40 +3172,75 @@ async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_u
     if not check_rate_limit(str(user["_id"]), "job_create", 5):
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
     job_cost = TOKEN_COSTS["job_generation"]
-    ok, msg = await deduct_tokens(user, job_cost)
-    if not ok:
-        raise HTTPException(status_code=402, detail=msg)
-    await log_token_usage(user, "job_generation", "job_generation", job_cost)
-    user = await db.users.find_one({"_id": to_object_id(user["_id"])})
-    if not user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    job_id = f"job_{uuid.uuid4().hex[:12]}"
-    content = f"{job.title} at {job.company}\n\n{job.description}"
-    if get_plan(user)["aiEnabled"] and GEMINI_API_KEY:
-        try:
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            prompt = (f"Write a compelling social media job post for: {job.title} at {job.company}. "
-                      f"Location: {job.location or 'Remote'}. Type: {job.job_type}. "
-                      f"Salary: {job.salary or 'Competitive'}. "
-                      f"Requirements: {', '.join(job.requirements) if job.requirements else job.description}. "
-                      f"Keep it concise, engaging and under 280 words.")
-            response = model.generate_content(prompt)
-            content = response.text
-        except Exception as e:
-            logger.error(f"AI job content error: {e}")
-    doc = {
-        "job_id": job_id, "user_id": str(user["_id"]),
-        "title": job.title, "company": job.company, "location": job.location,
-        "description": job.description, "requirements": job.requirements,
-        "salary": job.salary, "job_type": job.job_type,
-        "generated_content": content, "can_export": get_plan(user)["jobExport"],
-        "tokens_used": job_cost,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-    }
+    doc = await build_job_post_doc(job, user, job_cost, charge_tokens=True)
     await db.job_posts.insert_one(doc)
     doc.pop("_id", None)
     return doc
+
+
+@api_router.post("/job-posts/bulk-create")
+async def bulk_create_job_posts(data: JobPostBulk, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobPosting")
+    if not data.jobs:
+        raise HTTPException(status_code=400, detail="No job posts provided")
+
+    created = []
+    errors = []
+    for idx, job in enumerate(data.jobs, start=1):
+        try:
+            doc = await build_job_post_doc(job, user, TOKEN_COSTS["job_generation"], charge_tokens=True)
+            await db.job_posts.insert_one(doc)
+            doc.pop("_id", None)
+            created.append(doc)
+        except HTTPException as exc:
+            errors.append(f"Row {idx}: {exc.detail}")
+        except Exception as exc:
+            errors.append(f"Row {idx}: {exc}")
+
+    return {"created": created, "success": len(created), "failed": len(errors), "errors": errors}
+
+
+@api_router.get("/job-posts/outreach/stats")
+async def get_outreach_stats(user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobExport")
+    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
+    sent_today = await db.job_lead_outreach.count_documents({
+        "user_id": {"$in": user_id_variants(user["_id"])},
+        "createdAt": {"$gte": today_start}
+    })
+    total_sent = await db.job_lead_outreach.count_documents({"user_id": {"$in": user_id_variants(user["_id"])}})
+    return {
+        "sent_today": sent_today,
+        "daily_cap": 50,
+        "total_sent": total_sent,
+        "remaining_today": max(0, 50 - sent_today)
+    }
+
+
+@api_router.put("/job-posts/{job_id}")
+async def update_job_post(job_id: str, job: JobPostCreate, user: dict = Depends(get_current_user)):
+    enforce_feature(user, "jobPosting")
+    validate_job_post_payload(job)
+    existing = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Job post not found")
+
+    updated_doc = {
+        "title": job.title.strip(),
+        "company": job.company.strip(),
+        "location": job.location.strip(),
+        "description": job.description.strip(),
+        "requirements": job.requirements,
+        "salary": job.salary.strip(),
+        "job_type": job.job_type.strip(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.job_posts.update_one(
+        {"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}},
+        {"$set": updated_doc}
+    )
+    refreshed = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}}, {"_id": 0})
+    return refreshed
 
 
 @api_router.post("/job-posts/{job_id}/export")
@@ -2985,23 +3339,6 @@ async def send_job_outreach(job_id: str, data: dict = Body(...), user: dict = De
         "tokens_used": outreach_cost,
         "remaining_daily": daily_cap - sent_today - 1,
         "message": f"Job post sent to {len(lead_ids)} candidate(s)!"
-    }
-
-
-@app.get("/job-posts/outreach/stats")
-async def get_outreach_stats(user: dict = Depends(get_current_user)):
-    enforce_feature(user, "jobExport")
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    sent_today = await db.job_lead_outreach.count_documents({
-        "user_id": {"$in": user_id_variants(user["_id"])},
-        "createdAt": {"$gte": today_start}
-    })
-    total_sent = await db.job_lead_outreach.count_documents({"user_id": {"$in": user_id_variants(user["_id"])}})
-    return {
-        "sent_today": sent_today,
-        "daily_cap": 50,
-        "total_sent": total_sent,
-        "remaining_today": max(0, 50 - sent_today)
     }
 
 

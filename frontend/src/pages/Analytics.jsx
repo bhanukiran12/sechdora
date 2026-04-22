@@ -18,20 +18,31 @@ export default function Analytics() {
 
   useEffect(() => {
     fetchAnalytics();
+    const refresh = () => fetchAnalytics(true);
+    const interval = setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
-  const fetchAnalytics = async () => {
+  const fetchAnalytics = async (silent = false) => {
     try {
       const token = localStorage.getItem('access_token');
       const response = await axios.get(`${API}/analytics/overview`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       setAnalytics(response.data);
-      setLoading(false);
+      if (!silent) setLoading(false);
     } catch (error) {
       console.error('Error fetching analytics:', error);
-      toast.error('Failed to load analytics');
-      setLoading(false);
+      if (!silent) {
+        toast.error('Failed to load analytics');
+        setLoading(false);
+      }
     }
   };
 
@@ -219,23 +230,15 @@ export default function Analytics() {
 
         {/* Best Posting Times */}
         <div className="brutal-card p-6" data-testid="best-times-section">
-          <h2 className="text-2xl font-bold font-heading mb-4">Best Posting Times</h2>
+          <h2 className="text-2xl font-bold font-heading mb-4">Observed Posting Windows</h2>
           <div className="grid md:grid-cols-3 gap-4">
-            <div className="border-2 border-border rounded-xl p-4">
-              <div className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-2">Weekdays</div>
-              <div className="text-2xl font-black font-heading">9-11 AM</div>
-              <div className="text-xs text-text-muted mt-1">Highest engagement</div>
-            </div>
-            <div className="border-2 border-border rounded-xl p-4">
-              <div className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-2">Evenings</div>
-              <div className="text-2xl font-black font-heading">7-9 PM</div>
-              <div className="text-xs text-text-muted mt-1">Second best</div>
-            </div>
-            <div className="border-2 border-border rounded-xl p-4">
-              <div className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-2">Weekends</div>
-              <div className="text-2xl font-black font-heading">10 AM-2 PM</div>
-              <div className="text-xs text-text-muted mt-1">Consistent reach</div>
-            </div>
+            {(analytics?.best_times || []).slice(0, 3).map((slot, index) => (
+              <div key={`${slot.label}-${index}`} className="border-2 border-border rounded-xl p-4">
+                <div className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-2">Window {index + 1}</div>
+                <div className="text-2xl font-black font-heading">{slot.label}</div>
+                <div className="text-xs text-text-muted mt-1">{slot.note}</div>
+              </div>
+            ))}
           </div>
         </div>
       </main>

@@ -136,10 +136,15 @@ export default function Dashboard() {
 
   useEffect(() => {
     fetchData();
-    const interval = setInterval(() => {
-      fetchData();
-    }, 45000);
-    return () => clearInterval(interval);
+    const refresh = () => fetchData(true);
+    const interval = setInterval(refresh, 15000);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      clearInterval(interval);
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
   }, []);
 
   useEffect(() => {
@@ -155,7 +160,7 @@ export default function Dashboard() {
     }
   }, [location.search, navigate]);
 
-  const fetchData = async () => {
+  const fetchData = async (silent = false) => {
     try {
       const token = localStorage.getItem('access_token');
       const headers = { Authorization: `Bearer ${token}` };
@@ -205,7 +210,7 @@ export default function Dashboard() {
         .slice(0, 4);
       setRecentPublishActivity(recentActivity);
 
-      setLoading(false);
+      if (!silent) setLoading(false);
 
       // Trigger the feedback modal only when a fresh publish has just happened.
       const publishedCount = postsRes.data.filter(p => p.status === 'published').length;
@@ -225,8 +230,10 @@ export default function Dashboard() {
       }
     } catch (error) {
       console.error('Error fetching data:', error);
-      toast.error('Failed to load dashboard data');
-      setLoading(false);
+      if (!silent) {
+        toast.error('Failed to load dashboard data');
+        setLoading(false);
+      }
     }
   };
 
