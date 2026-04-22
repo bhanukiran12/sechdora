@@ -384,7 +384,9 @@ class LinkedInJobAdapter(PlatformAdapter):
             raise ValueError(f"Missing required job fields: {', '.join(missing)}")
 
     async def get_client_token(self):
-        if not self.LINKEDIN_JOB_CLIENT_ID or not self.LINKEDIN_JOB_CLIENT_SECRET:
+        client_id = os.environ.get('LINKEDIN_JOB_CLIENT_ID')
+        client_secret = os.environ.get('LINKEDIN_JOB_CLIENT_SECRET')
+        if not client_id or not client_secret:
             raise ValueError("LINKEDIN_JOB_CLIENT_ID/SECRET not configured")
         
         resp = requests.post(
@@ -392,8 +394,8 @@ class LinkedInJobAdapter(PlatformAdapter):
             headers={'Content-Type': 'application/x-www-form-urlencoded'},
             data={
                 'grant_type': 'client_credentials',
-                'client_id': self.LINKEDIN_JOB_CLIENT_ID,
-                'client_secret': self.LINKEDIN_JOB_CLIENT_SECRET,
+                'client_id': client_id,
+                'client_secret': client_secret,
             },
             timeout=10
         )
