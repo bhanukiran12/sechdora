@@ -50,6 +50,17 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY")
 if GEMINI_API_KEY:
     genai.configure(api_key=GEMINI_API_KEY)
 APP_NAME = "schedora"
+
+
+async def ping_database() -> bool:
+    try:
+        await client.admin.command("ping")
+        return True
+    except Exception as exc:
+        logger.error(f"MongoDB ping failed: {exc}", exc_info=True)
+        return False
+
+
 def _derive_public_backend_url():
     # Explicit override wins
     if os.environ.get("BACKEND_URL"):
@@ -806,25 +817,31 @@ async def verify_otp(data: UserVerifyOTP, response: Response):
 @api_router.post("/auth/login", response_model=SessionResponse)
 async def login(credentials: UserLogin, response: Response, request: Request):
     email = credentials.email.lower()
-    user = await db.users.find_one({"email": email})
-    
-    if not user or not user.get("password_hash") or not verify_password(credentials.password, user["password_hash"]):
-        raise HTTPException(status_code=401, detail="Invalid email or password")
-    
-    if user.get("status") == "unverified":
-        raise HTTPException(status_code=403, detail="Email not verified")
+    try:
+        user = await db.users.find_one({"email": email})
 
-    user_id = str(user["_id"])
-    access_token = create_access_token(user_id, email)
-    refresh_token = create_refresh_token(user_id)
-    response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=900, path="/")
-    response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
-    
-    user["_id"] = user_id
-    user.pop("password_hash", None)
-    
-    await log_event(user_id, "user_login", {"email": email})
-    return SessionResponse(access_token=access_token, user=user)
+        if not user or not user.get("password_hash") or not verify_password(credentials.password, user["password_hash"]):
+            raise HTTPException(status_code=401, detail="Invalid email or password")
+
+        if user.get("status") == "unverified":
+            raise HTTPException(status_code=403, detail="Email not verified")
+
+        user_id = str(user["_id"])
+        access_token = create_access_token(user_id, email)
+        refresh_token = create_refresh_token(user_id)
+        response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=900, path="/")
+        response.set_cookie(key="refresh_token", value=refresh_token, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+
+        user["_id"] = user_id
+        user.pop("password_hash", None)
+
+        await log_event(user_id, "user_login", {"email": email})
+        return SessionResponse(access_token=access_token, user=user)
+    except HTTPException:
+        raise
+    except Exception as exc:
+        logger.error(f"Login failed for {email}: {exc}", exc_info=True)
+        raise HTTPException(status_code=503, detail="Database unavailable. Please try again shortly.")
 
 @api_router.post("/auth/logout")
 async def logout(response: Response, user: dict = Depends(get_current_user)):
@@ -2852,7 +2869,16 @@ async def get_outreach_stats(user: dict = Depends(get_current_user)):
 
 @app.get("/health")
 async def health_check():
-    return {"status": "healthy", "service": "schedora-backend"}
+    db_ok = await ping_database()
+    status = "healthy" if db_ok else "degraded"
+    payload = {
+        "status": status,
+        "service": "schedora-backend",
+        "database": "connected" if db_ok else "unavailable",
+    }
+    if not db_ok:
+        return JSONResponse(status_code=503, content=payload)
+    return payload
 
 @app.get("/")
 async def root():
