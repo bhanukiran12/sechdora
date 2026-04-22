@@ -30,7 +30,7 @@ RUN apt-get update && apt-get install -y nginx supervisor && rm -rf /var/lib/apt
 RUN rm -f /etc/nginx/sites-enabled/default /etc/nginx/conf.d/default.conf
 RUN cp -r /app/build/. /usr/share/nginx/html/
 COPY nginx.conf /etc/nginx/templates/default.conf.template
-
+sed -i 's/--port 8080/--port 8000/g' Dockerfile.backend
 COPY start.sh /start.sh
 RUN chmod +x /start.sh
 
