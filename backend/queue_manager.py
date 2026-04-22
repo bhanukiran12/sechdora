@@ -1,7 +1,6 @@
 import asyncio
 # Replace: from server import logger, db, publish_post
-from server import app
-import asyncio
+
 from common import logger, db
 
 async def enqueue_publish(post_id: str):
