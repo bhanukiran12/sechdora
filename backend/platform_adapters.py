@@ -3,7 +3,9 @@ import requests
 import logging
 from abc import ABC, abstractmethod
 from typing import Dict
-from server import linkedin_headers, fetch_media_binary, linkedin_upload_image, refresh_social_token
+# Replace: from server import linkedin_headers, fetch_media_binary, ...
+from common import linkedin_headers, fetch_media_binary, linkedin_upload_image, refresh_social_token
+# Remove other server imports
 import time
 from datetime import datetime, timezone
 
