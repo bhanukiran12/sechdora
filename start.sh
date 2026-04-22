@@ -1,4 +1,6 @@
 #!/bin/bash
+set -e
 
-python -m uvicorn server:app --host 0.0.0.0 --port 8080 &
+export PORT="${PORT:-10000}"
+envsubst '${PORT}' < /etc/nginx/templates/default.conf.template > /etc/nginx/conf.d/default.conf
 nginx -g "daemon off;"
