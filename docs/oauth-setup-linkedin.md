@@ -332,9 +332,39 @@ def subscribe_to_webhooks(access_token, webhook_url):
 4. **Monitor analytics** to optimize posting times
 5. **Respect rate limits** - implement queuing
 
+## 🚀 Job Postings (Client Credentials - SEPARATE APP REQUIRED)
+
+**Important**: Job postings use **Client Credentials flow** (app-level). Create **NEW LinkedIn App**:
+
+### Step 1: Create Job Postings App
+1. [LinkedIn Developers](https://www.linkedin.com/developers/) → **Create app**
+2. **Products** tab → Add **Marketing Developer Platform**
+3. **Auth** tab → Note **Client ID/Secret**
+4. Add to `.env`:
+   ```
+   LINKEDIN_JOB_CLIENT_ID=abc...
+   LINKEDIN_JOB_CLIENT_SECRET=xyz...
+   ```
+
+### Step 2: Test
+```
+curl -X POST /api/job-posts/{job_id}/publish-linkedin \
+  -H "Authorization: Bearer {user_token}"
+```
+Returns `{task_id}` → polls status → publishes job!
+
+### API Details
+```
+POST https://api.linkedin.com/rest/simpleJobPostings
+Payload: {title, company, location, description, employmentType, salary, skillsAndExperience}
+Async: Returns taskId → GET /rest/simpleJobPostings/taskStatus/{taskId}
+```
+
 ## Resources
 
 - [LinkedIn API Documentation](https://learn.microsoft.com/en-us/linkedin/)
 - [Share on LinkedIn](https://learn.microsoft.com/en-us/linkedin/consumer/integrations/self-serve/share-on-linkedin)
-- [Marketing API](https://learn.microsoft.com/en-us/linkedin/marketing/)
+- [Marketing API](https://learn.microsoft.com/en-us/linkedin/marketing/)  
+- [Job Postings Docs](https://learn.microsoft.com/en-us/linkedin/talent/simple-job-postings-api)
 - [Best Practices](https://learn.microsoft.com/en-us/linkedin/shared/api-guide/best-practices)
+

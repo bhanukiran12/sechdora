@@ -9,19 +9,16 @@ import {
   Download,
   Lock,
   Sparkles,
-  Search,
   Loader2,
   Pencil,
   FileSpreadsheet,
   RefreshCw,
-  Users,
   Send,
 } from "lucide-react";
 import Sidebar from "@/components/Sidebar";
 import UpgradeModal from "@/components/UpgradeModal";
 
 const API = "/api";
-const OUTREACH_BATCH_COST = 10;
 
 const createEmptyJobForm = () => ({
   title: "",
@@ -147,14 +144,6 @@ export default function JobPosts() {
 
   const [form, setForm] = useState(createEmptyJobForm());
 
-  const [leadsModalOpen, setLeadsModalOpen] = useState(false);
-  const [selectedJob, setSelectedJob] = useState(null);
-  const [leads, setLeads] = useState([]);
-  const [leadsLoading, setLeadsLoading] = useState(false);
-  const [selectedLeads, setSelectedLeads] = useState([]);
-  const [sendingOutreach, setSendingOutreach] = useState(false);
-  const [outreachStats, setOutreachStats] = useState(null);
-
   const fetchAll = useCallback(async (silent = false) => {
     if (!token) return;
     const authHeaders = { Authorization: `Bearer ${token}` };
@@ -164,15 +153,10 @@ export default function JobPosts() {
       setPlanInfo(planRes.data);
 
       if (planRes.data.plan?.jobPosting) {
-        const requests = [
+        const [jobsRes] = await Promise.all([
           axios.get(`${API}/job-posts`, { headers: authHeaders }),
-        ];
-        if (planRes.data.plan?.jobExport) {
-          requests.push(axios.get(`${API}/job-posts/outreach/stats`, { headers: authHeaders }));
-        }
-        const [jobsRes, statsRes] = await Promise.all(requests);
+        ]);
         setJobs(jobsRes.data);
-        setOutreachStats(statsRes?.data || null);
       }
     } catch (err) {
       const detail = err.response?.data?.detail;
@@ -245,9 +229,6 @@ export default function JobPosts() {
           ? "Job post updated."
           : `Job post created${planInfo?.plan?.aiEnabled ? " with AI content." : "."}`
       );
-      if (!editingJobId && createdJob) {
-        setSelectedJob(createdJob);
-      }
     } catch (err) {
       const detail = err.response?.data?.detail;
       if (typeof detail === "object" && detail?.upgrade) {
@@ -289,50 +270,6 @@ export default function JobPosts() {
   const handleCopy = (content) => {
     navigator.clipboard.writeText(content || "");
     toast.success("Copied to clipboard");
-  };
-
-  const handleFindLeads = async (job) => {
-    if (!planInfo?.plan?.jobExport) {
-      setUpgradeModal({ open: true, message: "Upgrade to Business plan to find and outreach candidates." });
-      return;
-    }
-    setSelectedJob(job);
-    setLeadsModalOpen(true);
-    setLeadsLoading(true);
-    setSelectedLeads([]);
-    try {
-      const res = await axios.get(`${API}/job-posts/${job.job_id}/leads`, { headers });
-      setLeads(res.data.leads);
-    } catch {
-      toast.error("Failed to load candidates");
-      setLeadsModalOpen(false);
-    } finally {
-      setLeadsLoading(false);
-    }
-  };
-
-  const handleSendOutreach = async () => {
-    if (selectedLeads.length === 0) {
-      toast.error("Select at least one candidate");
-      return;
-    }
-
-    setSendingOutreach(true);
-    try {
-      const res = await axios.post(
-        `${API}/job-posts/${selectedJob.job_id}/send-outreach`,
-        { lead_ids: selectedLeads },
-        { headers }
-      );
-      toast.success(res.data.message);
-      setLeadsModalOpen(false);
-      await fetchAll(true);
-    } catch (err) {
-      const detail = err.response?.data?.detail;
-      toast.error(typeof detail === "string" ? detail : "Failed to send outreach");
-    } finally {
-      setSendingOutreach(false);
-    }
   };
 
   const handleExport = async (job) => {
@@ -451,12 +388,6 @@ export default function JobPosts() {
     }
   };
 
-  const toggleLeadSelection = (leadId) => {
-    setSelectedLeads((prev) => (
-      prev.includes(leadId) ? prev.filter((id) => id !== leadId) : [...prev, leadId]
-    ));
-  };
-
   const isLocked = planInfo && !planInfo.plan?.jobPosting;
 
   return (
@@ -472,7 +403,7 @@ export default function JobPosts() {
                 Job Posts
               </h1>
               <p className="mt-1 text-text-secondary">
-                Create, edit, bulk import, and turn job posts into outreach workflows.
+                Create, edit, bulk import, and publish job posts to LinkedIn.
               </p>
             </div>
             {!isLocked && (
@@ -515,12 +446,6 @@ export default function JobPosts() {
                 {planInfo.plan?.aiEnabled && <Sparkles className="w-4 h-4" strokeWidth={3} />}
                 {(planInfo.planType || "free").toUpperCase()} PLAN
               </div>
-              {planInfo.plan?.jobExport && outreachStats && (
-                <div className="inline-flex items-center gap-2 rounded-full border-2 border-black bg-green-50 px-4 py-2 text-sm font-bold">
-                  <Users className="w-4 h-4" strokeWidth={3} />
-                  Outreach credits: {outreachStats.sent_today}/{outreachStats.daily_cap} batches used today
-                </div>
-              )}
             </div>
           )}
 
@@ -713,7 +638,7 @@ export default function JobPosts() {
                   <div className="mb-1">
                     <div className="text-xs font-black uppercase tracking-[0.2em] text-text-muted">Section 3</div>
                     <div className="text-2xl font-black">Job Library</div>
-                    <p className="mt-1 text-sm text-text-secondary">Each card keeps creation, publishing, export, and outreach actions separate.</p>
+                    <p className="mt-1 text-sm text-text-secondary">Each card keeps editing, exporting, and LinkedIn publishing separate and clear.</p>
                   </div>
                   {jobs.map((job) => (
                     <div key={job.job_id} className="rounded-2xl border-4 border-black bg-white p-5 shadow-brutal">
@@ -756,11 +681,6 @@ export default function JobPosts() {
                           <button onClick={() => handleExport(job)} className={`rounded-lg border-2 border-black p-2 ${planInfo?.plan?.jobExport ? "hover:bg-black hover:text-white" : "opacity-40"}`} title="Export">
                             <Download className="w-4 h-4" strokeWidth={3} />
                           </button>
-                          {planInfo?.plan?.jobExport && (
-                            <button onClick={() => handleFindLeads(job)} className="rounded-lg border-2 border-black bg-blue-50 px-3 py-2 text-xs font-black uppercase tracking-wider hover:bg-black hover:text-white" title="Find candidates">
-                              Find Candidates · {OUTREACH_BATCH_COST} credits
-                            </button>
-                          )}
                           <button onClick={() => handleDelete(job.job_id)} className="rounded-lg border-2 border-red-500 p-2 text-red-500 hover:bg-red-500 hover:text-white" title="Delete">
                             <Trash2 className="w-4 h-4" strokeWidth={3} />
                           </button>
@@ -788,8 +708,7 @@ export default function JobPosts() {
                           <div className="rounded-xl border-2 border-black/10 bg-white p-4">
                             <div className="mb-1 text-xs font-black uppercase tracking-widest text-text-muted">Credits</div>
                             <p className="text-sm font-bold">Generation used: {job.tokens_used || 0} credits</p>
-                            <p className="text-sm font-bold">Candidate outreach: {OUTREACH_BATCH_COST} credits per batch</p>
-                            <p className="mt-1 text-xs text-text-muted">Use "Post to LinkedIn" for real publishing. Use "Find Candidates" for the outreach workflow.</p>
+                            <p className="mt-1 text-xs text-text-muted">Use "Post to LinkedIn" for direct publishing.</p>
                           </div>
                         </div>
                       </div>
@@ -801,77 +720,6 @@ export default function JobPosts() {
           )}
         </div>
       </main>
-
-      {leadsModalOpen && selectedJob && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 p-4">
-          <div className="max-h-[90vh] w-full max-w-2xl overflow-hidden rounded-2xl border-4 border-black bg-white shadow-brutal-lg">
-            <div className="border-b-4 border-black bg-primary p-6 text-white">
-              <div className="flex items-center justify-between">
-                <h2 className="flex items-center gap-2 text-xl font-black">
-                  <Search className="w-6 h-6" strokeWidth={3} />
-                  Find Candidates for {selectedJob.title}
-                </h2>
-                <button onClick={() => setLeadsModalOpen(false)} className="font-bold hover:underline">Close</button>
-              </div>
-              <p className="mt-1 text-sm text-white/80">
-                {selectedJob.company} · {selectedJob.location}
-              </p>
-            </div>
-
-            <div className="max-h-[60vh] overflow-y-auto p-6">
-              {leadsLoading ? (
-                <div className="flex items-center justify-center gap-3 py-12">
-                  <Loader2 className="w-6 h-6 animate-spin" />
-                  <span className="font-bold">Finding matching candidates...</span>
-                </div>
-              ) : (
-                <>
-                  <p className="mb-4 text-sm font-bold text-text-secondary">
-                    Candidate outreach uses <span className="text-primary">{OUTREACH_BATCH_COST} credits</span> per batch, no matter how many leads you choose.
-                    <span className="block mt-1">This workflow is separate from publishing the job to your LinkedIn feed.</span>
-                  </p>
-                  <div className="space-y-2">
-                    {leads.map((lead) => (
-                      <label key={lead.id} className={`flex cursor-pointer items-start gap-3 rounded-xl border-2 border-black p-3 ${selectedLeads.includes(lead.id) ? "bg-primary text-white" : "hover:bg-surface"}`}>
-                        <input type="checkbox" checked={selectedLeads.includes(lead.id)} onChange={() => toggleLeadSelection(lead.id)} className="mt-1 h-5 w-5 accent-black" />
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 font-black">
-                            {lead.name}
-                            <span className={`rounded-full px-2 py-0.5 text-xs ${selectedLeads.includes(lead.id) ? "bg-white text-black" : "bg-black text-white"}`}>
-                              {lead.match_score}% match
-                            </span>
-                          </div>
-                          <p className={`text-sm font-bold ${selectedLeads.includes(lead.id) ? "text-white/90" : "text-text-secondary"}`}>
-                            {lead.title} · {lead.location}
-                          </p>
-                          <div className="mt-1 flex flex-wrap gap-1">
-                            {lead.skills.map((skill, index) => (
-                              <span key={`${lead.id}-${index}`} className={`rounded-full border px-2 py-0.5 text-xs ${selectedLeads.includes(lead.id) ? "border-white/30 text-white" : "border-black/20"}`}>
-                                {skill}
-                              </span>
-                            ))}
-                          </div>
-                        </div>
-                      </label>
-                    ))}
-                  </div>
-                </>
-              )}
-            </div>
-
-            <div className="flex items-center justify-between border-t-4 border-black bg-surface p-6">
-              <div className="text-sm font-bold">{selectedLeads.length} lead(s) selected</div>
-              <div className="flex gap-3">
-                <button onClick={() => setLeadsModalOpen(false)} className="brutal-button bg-white text-text-primary font-black" disabled={sendingOutreach}>Cancel</button>
-                <button onClick={handleSendOutreach} disabled={sendingOutreach || selectedLeads.length === 0} className="brutal-button bg-primary text-white font-black flex items-center gap-2 disabled:opacity-50">
-                  {sendingOutreach ? <Loader2 className="w-4 h-4 animate-spin" /> : null}
-                  Send Outreach
-                </button>
-              </div>
-            </div>
-          </div>
-        </div>
-      )}
 
       <UpgradeModal
         isOpen={upgradeModal.open}

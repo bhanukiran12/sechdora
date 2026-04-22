@@ -10,7 +10,7 @@ import logging
 import asyncio
 from pathlib import Path
 from pydantic import BaseModel, Field, EmailStr, validator
-from typing import List, Optional, Dict, Any
+from typing import List, Optional, Dict, Any, Literal
 import uuid
 from datetime import datetime, timezone, timedelta
 import requests
@@ -30,6 +30,8 @@ import resend
 import razorpay
 from bson import ObjectId
 from urllib.parse import urlparse, unquote
+from queue_manager import enqueue_publish, enqueue_retry
+from platform_adapters import ADAPTERS
 
 
 ROOT_DIR = Path(__file__).parent
@@ -119,8 +121,8 @@ SHORT_LINK_DOMAINS = ['bit.ly', 't.co', 'goo.gl', 'tinyurl.com', 'ow.ly', 'is.gd
 
 TOKEN_COSTS = {
     "ai_caption": 1,
-    "standard_post": 3,
-    "url_post": 20,
+    "standard_post": 2,
+    "url_post": 10,
     "job_generation": 15,
     "job_export": 10,
     "lead_outreach": 10,
@@ -221,21 +223,21 @@ async def log_token_usage(user, action, token_type, tokens):
 PLANS = {
     "free": {
         "name": "Free", "price": 0,
-        "maxAccounts": 1, "maxPostsPerMonth": 10,
+        "maxAccounts": 1, "maxPostsPerMonth": 10, "maxPlatforms": 1,
         "aiEnabled": False, "jobPosting": False, "jobExport": False,
         "prioritySupport": False, "bulkUpload": False,
         "analyticsDetailed": False, "customRecurrence": False,
     },
     "pro": {
         "name": "Pro", "price": 999,
-        "maxAccounts": 5, "maxPostsPerMonth": 100,
+        "maxAccounts": 5, "maxPostsPerMonth": 100, "maxPlatforms": 3,
         "aiEnabled": True, "jobPosting": True, "jobExport": False,
         "prioritySupport": False, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
     },
     "business": {
         "name": "Business", "price": 2999,
-        "maxAccounts": 15, "maxPostsPerMonth": None,
+        "maxAccounts": 15, "maxPostsPerMonth": None, "maxPlatforms": 10,
         "aiEnabled": True, "jobPosting": True, "jobExport": True,
         "prioritySupport": True, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
@@ -244,7 +246,7 @@ PLANS = {
 
 ADMIN_PLAN = {
     "name": "Admin", "price": 0,
-    "maxAccounts": 9999, "maxPostsPerMonth": None,
+    "maxAccounts": 9999, "maxPostsPerMonth": None, "maxPlatforms": 9999,
     "aiEnabled": True, "jobPosting": True, "jobExport": True,
     "prioritySupport": True, "bulkUpload": True,
     "analyticsDetailed": True, "customRecurrence": True,
@@ -917,6 +919,7 @@ class PostCreate(BaseModel):
     status: Optional[str] = "draft"
     recurrence: Optional[str] = None  # none, daily, weekly, monthly
     auto_retry: Optional[bool] = False
+    type: Literal["text", "image", "video", "link"]
 
 class TeamInvite(BaseModel):
     email: EmailStr
@@ -1608,6 +1611,13 @@ async def create_post(post_data: PostCreate, user: dict = Depends(get_current_us
     if not check_rate_limit(str(user["_id"]), "create_post", 20):
         raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
     await enforce_post_limit(user)
+    plan = get_plan(user)
+    if len(post_data.platforms) > plan["maxPlatforms"]:
+        raise HTTPException(status_code=403, detail={
+            "code": "platform_limit_reached",
+            "message": f"Platform limit reached ({len(post_data.platforms)}/{plan['maxPlatforms']}). Upgrade your plan to post to more platforms.",
+            "upgrade": True,
+        })
     if post_data.recurrence and post_data.recurrence.startswith("every_"):
         enforce_feature(user, "customRecurrence")
     post_id = f"post_{uuid.uuid4().hex[:12]}"
@@ -1624,7 +1634,7 @@ async def create_post(post_data: PostCreate, user: dict = Depends(get_current_us
         "reviewed_by": None, "recurrence": post_data.recurrence or "none",
         "auto_retry": post_data.auto_retry if post_data.auto_retry is not None else user.get("settings", {}).get("auto_retry_failed", True),
         "retry_count": 0, "created_at": datetime.now(timezone.utc).isoformat(),
-        "published_at": None, "logs": []
+        "published_at": None, "logs": [], "error_message": None, "type": post_data.type
     }
     await db.posts.insert_one(post_doc)
     await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$inc": {"postsUsedThisMonth": 1}})
@@ -2229,9 +2239,9 @@ def schedule_post(post_id: str, scheduled_time: str, recurrence: str = None):
                 scheduler.add_job(publish_recurring_post, trigger=trigger, args=[post_id], id=f"post_{post_id}", replace_existing=True)
                 logger.info(f"Recurring post {post_id} scheduled ({recurrence})")
             else:
-                scheduler.add_job(publish_post, trigger=DateTrigger(run_date=scheduled_dt), args=[post_id], id=f"post_{post_id}", replace_existing=True)
+                scheduler.add_job(enqueue_publish, trigger=DateTrigger(run_date=scheduled_dt), args=[post_id], id=f"post_{post_id}", replace_existing=True)
         else:
-            scheduler.add_job(publish_post, trigger=DateTrigger(run_date=scheduled_dt), args=[post_id], id=f"post_{post_id}", replace_existing=True)
+            scheduler.add_job(enqueue_publish, trigger=DateTrigger(run_date=scheduled_dt), args=[post_id], id=f"post_{post_id}", replace_existing=True)
             logger.info(f"Scheduled post {post_id} for {scheduled_time}")
     except Exception as e:
         logger.error(f"Error scheduling post {post_id}: {e}")
@@ -2391,9 +2401,15 @@ async def publish_recurring_post(post_id: str):
         return
     # Create a new instance of the post
     new_post_id = f"post_{uuid.uuid4().hex[:12]}"
-    # Trigger real publish for the instance
-    await publish_post(post_id, is_recurring_instance=True)
-    logger.info(f"Recurring post {post_id} triggered")
+    await db.posts.insert_one({
+        **post,
+        "post_id": new_post_id,
+        "status": "publishing",
+        "created_at": datetime.now(timezone.utc).isoformat()
+    })
+    # Enqueue the publish
+    enqueue_publish(new_post_id)
+    logger.info(f"Recurring post {post_id} enqueued as {new_post_id}")
 
 async def publish_post(post_id: str, is_recurring_instance: bool = False):
     try:
@@ -2422,6 +2438,7 @@ async def publish_post(post_id: str, is_recurring_instance: bool = False):
         # Fetch connected accounts for this user
         accounts = await db.social_accounts.find({"user_id": user_id, "status": "connected"}).to_list(100)
         target_accounts = sanitize_target_accounts(post.get("target_accounts"))
+        post['media'] = [{'url': url} for url in post.get('media_urls', [])]
 
         for platform in platforms:
             selected_accounts = select_target_accounts(accounts, platform, target_accounts)
@@ -2432,14 +2449,15 @@ async def publish_post(post_id: str, is_recurring_instance: bool = False):
 
             for account in selected_accounts:
                 # Call real API
-                res = {"status": "failed", "error": "Unknown platform logic"}
-                if platform == "twitter":
-                    res = await publish_to_twitter(account, post["content"], post.get("media_urls"))
-                elif platform == "linkedin":
-                    res = await publish_to_linkedin(account, post["content"], post.get("media_urls"))
-                else:
-                    # Simulation for other platforms
-                    res = {"status": "success", "message": "Simulation successful"}
+                post['account'] = account
+                try:
+                    adapter = ADAPTERS[platform]()
+                    await adapter.validate_content(post)
+                    res = await adapter.publish(post, account)
+                except ValueError as e:
+                    res = {"status": "failed", "error": str(e)}
+                except Exception as e:
+                    res = {"status": "failed", "error": f"Unexpected error: {str(e)}"}
 
                 if res["status"] == "success":
                     results.append({
@@ -2476,41 +2494,74 @@ async def publish_post(post_id: str, is_recurring_instance: bool = False):
                     })
                     all_success = False
 
-        status = "published" if all_success else ("failed" if all([r["status"] == "failed" for r in results]) else "partial")
-        
-        await db.posts.update_one({"post_id": target_post_id}, {
-            "$set": {
-                "status": status, 
-                "published_at": datetime.now(timezone.utc).isoformat() if all_success else None
-            }, 
-            "$push": {"logs": {"$each": results}}
-        })
+        all_success = all(r["status"] == "success" for r in results)
+        all_failed = all(r["status"] == "failed" for r in results)
 
         if all_success:
+            status = "published"
+            published_at = datetime.now(timezone.utc).isoformat()
+            await db.posts.update_one({"post_id": target_post_id}, {
+                "$set": {
+                    "status": status,
+                    "published_at": published_at
+                },
+                "$push": {"logs": {"$each": results}}
+            })
             await log_audit(user_id, "post.published", "post", target_post_id, {"platforms": platforms})
             await create_notification(user_id, "success", "Post Published", f"Your post to {', '.join(platforms)} was published successfully.", target_post_id)
-        elif status == "partial":
-            await create_notification(user_id, "warning", "Post Partial Success", "Post published to some platforms but failed on others.", target_post_id)
-        else:
-            raise Exception("All platforms failed")
+            logger.info(f"Finished processing post {target_post_id} - status: {status}")
+            return {"success": True}
 
-        logger.info(f"Finished processing post {target_post_id} - status: {status}")
+        elif all_failed:
+            retry_count = post.get("retry_count", 0)
+            if retry_count < 3:
+                delay_seconds = 60 * (2 ** (retry_count + 1))
+                enqueue_retry(post_id, delay_seconds)
+                status = "retrying"
+                results.append({"timestamp": datetime.now(timezone.utc).isoformat(), "status": "retry", "message": f"Scheduled retry in {delay_seconds} seconds (attempt {retry_count+1}/3)"})
+                await db.posts.update_one({"post_id": target_post_id}, {"$set": {"status": status}, "$inc": {"retry_count": 1}, "$push": {"logs": {"$each": results}}})
+                await create_notification(user_id, "info", "Post Retrying", f"Post failed, retrying in {delay_seconds} seconds.", target_post_id)
+                logger.info(f"Finished processing post {target_post_id} - status: {status}")
+                return {"success": False}
+            else:
+                status = "failed"
+                error_message = "Max retries exceeded"
+                results.append({"timestamp": datetime.now(timezone.utc).isoformat(), "status": "failed", "message": error_message})
+                await db.posts.update_one({"post_id": target_post_id}, {"$set": {"status": status, "error_message": error_message}, "$push": {"logs": {"$each": results}}})
+                await create_notification(user_id, "error", "Post Failed", "Post failed after max retries.", target_post_id)
+                logger.info(f"Finished processing post {target_post_id} - status: {status}")
+                return {"success": False}
+
+        else:
+            # partial success
+            status = "partial"
+            await db.posts.update_one({"post_id": target_post_id}, {
+                "$set": {
+                    "status": status
+                },
+                "$push": {"logs": {"$each": results}}
+            })
+            await create_notification(user_id, "warning", "Post Partial Success", "Post published to some platforms but failed on others.", target_post_id)
+            logger.info(f"Finished processing post {target_post_id} - status: {status}")
+            return {"success": True}
 
     except Exception as e:
         logger.error(f"Error publishing post {post_id}: {e}")
         log_entry = {"timestamp": datetime.now(timezone.utc).isoformat(), "status": "failed", "message": str(e)}
         await db.posts.update_one({"post_id": post_id}, {"$set": {"status": "failed"}, "$push": {"logs": log_entry}, "$inc": {"retry_count": 1}})
-        
+
         post = await db.posts.find_one({"post_id": post_id}, {"_id": 0})
         if post:
             await create_notification(post["user_id"], "error", "Post Failed", "Your post failed to publish. Tap to retry.", post_id)
-            
-            # Auto-retry logic
-            if post.get("auto_retry") and post.get("retry_count", 0) < 3:
-                retry_time = datetime.now(timezone.utc) + timedelta(minutes=15 * (post.get("retry_count", 0) + 1))
-                scheduler.add_job(publish_post, trigger=DateTrigger(run_date=retry_time), args=[post_id], id=f"retry_{post_id}_{post.get('retry_count',0)}", replace_existing=True)
-                await create_notification(post["user_id"], "info", "Auto-Retry Scheduled", f"Will retry in {5 * (post.get('retry_count', 0) + 1)} minutes.", post_id)
-            
+
+            # Retry logic
+            if post.get("retry_count", 0) < 3:
+                enqueue_retry(post_id, 60 * (2 ** post.get("retry_count", 0)))
+                await db.posts.update_one({"post_id": post_id}, {"$set": {"status": "retrying"}})
+                log_entry = {"timestamp": datetime.now(timezone.utc).isoformat(), "status": "retry", "message": f"Scheduled retry in {60 * (2 ** post.get('retry_count', 0))} seconds (attempt {post.get('retry_count', 0)+1}/3)"}
+                await db.posts.update_one({"post_id": post_id}, {"$push": {"logs": log_entry}})
+                await create_notification(post["user_id"], "info", "Post Retrying", f"Will retry in {60 * (2 ** post.get('retry_count', 0))} seconds.", post_id)
+
             # Email notification on failure
             user = await db.users.find_one({"_id": ObjectId(post["user_id"]) if len(post["user_id"]) == 24 else None})
             if not user:
@@ -2522,7 +2573,7 @@ async def publish_post(post_id: str, is_recurring_instance: bool = False):
                   <div style="font-size:11px;font-weight:900;letter-spacing:0.2em;text-transform:uppercase;color:#ff4500;margin-bottom:8px;">Post preview</div>
                   <div style="font-size:14px;line-height:1.6;color:#222222;">{post["content"][:140]}{'...' if len(post["content"]) > 140 else ''}</div>
                 </div>
-                <p style="margin:0;font-size:13px;line-height:1.6;color:#555555;">{"Auto-retry is enabled. We will retry shortly." if post.get("auto_retry") else "Please retry manually from your dashboard."}</p>
+                <p style="margin:0;font-size:13px;line-height:1.6;color:#555555;">{"We will retry shortly." if post.get("retry_count", 0) < 3 else "Please retry manually from your dashboard."}</p>
                 """
                 await send_email(
                     user["email"],
@@ -2535,6 +2586,7 @@ async def publish_post(post_id: str, is_recurring_instance: bool = False):
                         cta_href=f"{os.environ.get('FRONTEND_URL','')}/dashboard"
                     )
                 )
+        return {"success": False}
 
 
 # ========== WEEKLY DIGEST ==========
@@ -2972,8 +3024,6 @@ async def create_indexes():
     await db.posts.create_index("status")
     await db.job_posts.create_index("user_id")
     await db.job_posts.create_index("job_id")
-    await db.job_lead_outreach.create_index("user_id")
-    await db.job_lead_outreach.create_index("createdAt")
     await db.analytics.create_index("user_id")
     await db.notifications.create_index("user_id")
     await db.oauth_states.create_index("expires_at", expireAfterSeconds=0)
@@ -3210,23 +3260,6 @@ async def bulk_create_job_posts(data: JobPostBulk, user: dict = Depends(get_curr
     return {"created": created, "success": len(created), "failed": len(errors), "errors": errors}
 
 
-@api_router.get("/job-posts/outreach/stats")
-async def get_outreach_stats(user: dict = Depends(get_current_user)):
-    enforce_feature(user, "jobExport")
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0).isoformat()
-    sent_today = await db.job_lead_outreach.count_documents({
-        "user_id": {"$in": user_id_variants(user["_id"])},
-        "createdAt": {"$gte": today_start}
-    })
-    total_sent = await db.job_lead_outreach.count_documents({"user_id": {"$in": user_id_variants(user["_id"])}})
-    return {
-        "sent_today": sent_today,
-        "daily_cap": 50,
-        "total_sent": total_sent,
-        "remaining_today": max(0, 50 - sent_today)
-    }
-
-
 @api_router.put("/job-posts/{job_id}")
 async def update_job_post(job_id: str, job: JobPostCreate, user: dict = Depends(get_current_user)):
     enforce_feature(user, "jobPosting")
@@ -3260,29 +3293,41 @@ async def publish_job_post_to_linkedin(job_id: str, user: dict = Depends(get_cur
     if not post:
         raise HTTPException(status_code=404, detail="Job post not found")
 
-    account = await db.social_accounts.find_one({
-        "user_id": {"$in": user_id_variants(user["_id"])},
-        "platform": "linkedin",
-        "status": "connected"
-    }, {"_id": 0})
-    if not account:
-        raise HTTPException(status_code=400, detail="Connect a LinkedIn account first")
+    try:
+        from platform_adapters import ADAPTERS
+        adapter = ADAPTERS["linkedin_job"]()
+        result = await adapter.publish(post)
+        if result.get("status") != "submitted":
+            raise HTTPException(status_code=400, detail=result.get("error", "Job submission failed"))
 
-    result = await publish_to_linkedin(account, post.get("generated_content", ""), [])
-    if result.get("status") != "success":
-        raise HTTPException(status_code=400, detail=result.get("error", "LinkedIn publish failed"))
-
-    await db.job_posts.update_one(
-        {"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}},
-        {"$set": {
-            "linkedin_post_id": result.get("platform_post_id"),
-            "linkedin_published_at": datetime.now(timezone.utc).isoformat(),
-        }}
-    )
-    return {
-        "message": "Job post published to LinkedIn",
-        "platform_post_id": result.get("platform_post_id"),
-    }
+        task_id = result.get("task_id")
+        status = await adapter.poll_task_status(task_id)
+        
+        if status == "success":
+            await db.job_posts.update_one(
+                {"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}},
+                {"$set": {
+                    "linkedin_job_posting_id": task_id,
+                    "linkedin_job_task_status": "COMPLETED",
+                    "linkedin_published_at": datetime.now(timezone.utc).isoformat(),
+                }}
+            )
+            return {
+                "message": "✅ Job post submitted to LinkedIn Jobs (async processing complete)",
+                "task_id": task_id,
+                "status": "COMPLETED"
+            }
+        elif status == "failed":
+            raise HTTPException(status_code=400, detail="Job posting failed during async processing")
+        else:
+            return {
+                "message": "⏳ Job post submitted to LinkedIn Jobs (processing)",
+                "task_id": task_id,
+                "status": status
+            }
+    except Exception as e:
+        logger.error(f"LinkedIn job posting error: {e}")
+        raise HTTPException(status_code=500, detail=f"Job posting failed: {str(e)}")
 
 
 @api_router.post("/job-posts/{job_id}/export")
@@ -3306,82 +3351,6 @@ async def delete_job_post(job_id: str, user: dict = Depends(get_current_user)):
     if result.deleted_count == 0:
         raise HTTPException(status_code=404, detail="Job post not found")
     return {"message": "Job post deleted"}
-
-
-# ─── Job Lead Outreach ────────────────────────────────────────────────────────
-
-@api_router.get("/job-posts/{job_id}/leads")
-async def get_job_leads(job_id: str, user: dict = Depends(get_current_user)):
-    enforce_feature(user, "jobExport")  # Business-only
-    post = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}})
-    if not post:
-        raise HTTPException(status_code=404, detail="Job post not found")
-    # Mock leads based on skills/title
-    skills = post.get("requirements", [])
-    title = post.get("title", "")
-    # Generate 8 mock candidates
-    mock_names = ["Alex Rivera", "Priya Sharma", "Jordan Lee", "Ananya Patel", "Sam Carter", "Mei Lin", "Rohan Kumar", "Fatima Al-Fahim"]
-    mock_titles = ["Senior Engineer", "Lead Developer", "Staff Engineer", "Principal Engineer", "Tech Lead", "Architect", "Manager", "Director"]
-    mock_locations = ["Bangalore", "Mumbai", "Remote", "Hybrid", "Delhi NCR", "Remote"]
-    mock_skills = [["React", "TypeScript", "Node.js"], ["Python", "Django", "PostgreSQL"], ["Java", "Spring", "AWS"], ["Go", "K8s", "Microservices"], ["Frontend", "React", "UI/UX"], ["Full-stack", "MERN", "GraphQL"], ["DevOps", "Kubernetes", "CI/CD"], ["Backend", "API", "Scalability"]]
-    leads = []
-    for i in range(8):
-        primary_skills = mock_skills[i % len(mock_skills)]
-        leads.append({
-            "id": f"lead_{uuid.uuid4().hex[:8]}",
-            "name": mock_names[i],
-            "title": mock_titles[i % len(mock_titles)],
-            "location": mock_locations[i % len(mock_locations)],
-            "skills": primary_skills + (skills[:2] if skills else []),
-            "match_score": 85 + (i * 2),
-            "email": f"candidate{i+1}@example.com",
-        })
-    return {"job": {"title": title, "company": post.get("company", "")}, "leads": leads}
-
-
-@api_router.post("/job-posts/{job_id}/send-outreach")
-async def send_job_outreach(job_id: str, data: dict = Body(...), user: dict = Depends(get_current_user)):
-    enforce_feature(user, "jobExport")  # Business-only
-    post = await db.job_posts.find_one({"job_id": job_id, "user_id": {"$in": user_id_variants(user["_id"])}})
-    if not post:
-        raise HTTPException(status_code=404, detail="Job post not found")
-    lead_ids = data.get("lead_ids", [])
-    if not lead_ids:
-        raise HTTPException(status_code=400, detail="No leads selected")
-    # Daily cap: 50 messages per user per day
-    today_start = datetime.now(timezone.utc).replace(hour=0, minute=0, second=0, microsecond=0)
-    sent_today = await db.job_lead_outreach.count_documents({
-        "user_id": {"$in": user_id_variants(user["_id"])},
-        "createdAt": {"$gte": today_start.isoformat()}
-    })
-    daily_cap = 50
-    if sent_today >= daily_cap:
-        raise HTTPException(status_code=429, detail=f"Daily outreach limit reached ({daily_cap}/day). Try again tomorrow.")
-    # Token cost: 10 tokens per batch (regardless of count of leads in batch)
-    outreach_cost = TOKEN_COSTS["lead_outreach"]
-    ok, msg = await deduct_tokens(user, outreach_cost)
-    if not ok:
-        raise HTTPException(status_code=402, detail=msg)
-    await log_token_usage(user, "outreach", "lead_outreach", outreach_cost)
-    # Record outreach
-    await db.job_lead_outreach.insert_one({
-        "user_id": str(user["_id"]),
-        "job_id": job_id,
-        "job_title": post.get("title"),
-        "company": post.get("company"),
-        "leads_sent": lead_ids,
-        "leads_count": len(lead_ids),
-        "tokens_used": outreach_cost,
-        "createdAt": datetime.now(timezone.utc).isoformat(),
-    })
-    # Simulated send (in production, integrate email/LinkedIn/etc.)
-    return {
-        "success": True,
-        "sent_count": len(lead_ids),
-        "tokens_used": outreach_cost,
-        "remaining_daily": daily_cap - sent_today - 1,
-        "message": f"Job post sent to {len(lead_ids)} candidate(s)!"
-    }
 
 
 @app.get("/health")
