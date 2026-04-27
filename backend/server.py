@@ -224,21 +224,21 @@ PLANS = {
     "free": {
         "name": "Free", "price": 0,
         "maxAccounts": 1, "maxPostsPerMonth": 10, "maxPlatforms": 1,
-        "aiEnabled": False, "jobPosting": False, "jobExport": False,
+        "aiEnabled": False,
         "prioritySupport": False, "bulkUpload": False,
         "analyticsDetailed": False, "customRecurrence": False,
     },
     "pro": {
         "name": "Pro", "price": 999,
         "maxAccounts": 5, "maxPostsPerMonth": 100, "maxPlatforms": 3,
-        "aiEnabled": True, "jobPosting": True, "jobExport": False,
+        "aiEnabled": True,
         "prioritySupport": False, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
     },
     "business": {
         "name": "Business", "price": 2999,
         "maxAccounts": 15, "maxPostsPerMonth": None, "maxPlatforms": 10,
-        "aiEnabled": True, "jobPosting": True, "jobExport": True,
+        "aiEnabled": True,
         "prioritySupport": True, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
     },
@@ -247,7 +247,7 @@ PLANS = {
 ADMIN_PLAN = {
     "name": "Admin", "price": 0,
     "maxAccounts": 9999, "maxPostsPerMonth": None, "maxPlatforms": 9999,
-    "aiEnabled": True, "jobPosting": True, "jobExport": True,
+    "aiEnabled": True,
     "prioritySupport": True, "bulkUpload": True,
     "analyticsDetailed": True, "customRecurrence": True,
 }
@@ -706,14 +706,12 @@ def enforce_feature(user: dict, feature: str):
     if not plan.get(feature, False):
         feature_names = {
             "aiEnabled": "AI content generation",
-            "jobPosting": "Job Posts",
-            "jobExport": "Job Post export",
             "prioritySupport": "Priority support",
             "bulkUpload": "Bulk CSV upload",
             "analyticsDetailed": "Detailed analytics",
             "customRecurrence": "Custom repeat intervals",
         }
-        plan_needed = "Pro or Business" if feature not in ("jobExport",) else "Business"
+        plan_needed = "Pro or Business"
         raise HTTPException(status_code=403, detail={
             "code": "feature_locked",
             "message": f"Upgrade to {plan_needed} to access {feature_names.get(feature, feature)}.",
