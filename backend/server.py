@@ -1258,7 +1258,10 @@ async def google_callback(code: str = Query(None), state: str = Query(None), err
     await log_event(user_id, "user_login_google", {"email": email})
 
     # Redirect to frontend with token in URL (frontend picks it up and stores in localStorage)
-    return RedirectResponse(f"{frontend_url}/auth/callback?token={access_token}&refresh={refresh_tok}&provider=google")
+    redirect_response = RedirectResponse(f"{frontend_url}/auth/callback?token={access_token}&refresh={refresh_tok}&provider=google")
+    redirect_response.set_cookie(key="access_token", value=access_token, httponly=True, secure=False, samesite="lax", max_age=900, path="/")
+    redirect_response.set_cookie(key="refresh_token", value=refresh_tok, httponly=True, secure=False, samesite="lax", max_age=604800, path="/")
+    return redirect_response
 
 
 @api_router.post("/auth/refresh")
