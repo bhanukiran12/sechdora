@@ -22,7 +22,7 @@ import Onboarding from "@/pages/Onboarding";
 import PrivacyPolicy from "@/pages/PrivacyPolicy";
 import TermsOfService from "@/pages/TermsOfService";
 import PricingPage from "@/pages/PricingPage";
-import JobPosts from "@/pages/JobPosts";
+import AuthCallback from "@/pages/AuthCallback";
 import TokenDashboard from "@/pages/TokenDashboard";
 import FeedbackModal from "@/components/FeedbackModal";
 import { MessageSquare } from "lucide-react";
@@ -120,6 +120,7 @@ function AppRouter() {
     <Routes>
       <Route path="/" element={<Landing />} />
       <Route path="/login" element={<Login />} />
+      <Route path="/auth/callback" element={<AuthCallback />} />
       <Route path="/privacy" element={<PrivacyPolicy />} />
       <Route path="/terms" element={<TermsOfService />} />
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
@@ -131,7 +132,6 @@ function AppRouter() {
       <Route path="/settings/accounts" element={<ProtectedRoute><ConnectedAccounts /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
       <Route path="/pricing" element={<PricingPage />} />
-      <Route path="/jobs" element={<ProtectedRoute><JobPosts /></ProtectedRoute>} />
       <Route path="/tokens" element={<ProtectedRoute><TokenDashboard /></ProtectedRoute>} />
     </Routes>
   );

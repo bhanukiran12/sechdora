@@ -54,7 +54,6 @@ export default function Sidebar({ active }) {
     { id: 'schedule', label: 'Calendar', icon: Calendar, path: '/posts/schedule' },
     { id: 'bulk', label: 'Bulk Upload', icon: Upload, path: '/posts/bulk-upload' },
     { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
-    { id: 'jobs', label: 'Job Posts', icon: Briefcase, path: '/jobs' },
     { id: 'accounts', label: 'Accounts', icon: Settings, path: '/settings/accounts' },
     { id: 'tokens', label: 'Credits', icon: Coins, path: '/tokens' },
     { id: 'pricing', label: 'Pricing', icon: Zap, path: '/pricing' },

@@ -123,8 +123,6 @@ TOKEN_COSTS = {
     "ai_caption": 1,
     "standard_post": 2,
     "url_post": 10,
-    "job_generation": 15,
-    "job_export": 10,
     "lead_outreach": 10,
 }
 
@@ -3023,8 +3021,6 @@ async def create_indexes():
     await db.login_attempts.create_index("identifier")
     await db.posts.create_index("user_id")
     await db.posts.create_index("status")
-    await db.job_posts.create_index("user_id")
-    await db.job_posts.create_index("job_id")
     await db.analytics.create_index("user_id")
     await db.notifications.create_index("user_id")
     await db.oauth_states.create_index("expires_at", expireAfterSeconds=0)
@@ -3142,124 +3138,7 @@ async def verify_payment(data: VerifyPaymentRequest, user: dict = Depends(get_cu
     return {"success": True, "plan": data.plan, "message": f"Successfully upgraded to {PLANS[data.plan]['name']} plan!"}
 
 
-# ─── Job Posts Endpoints ──────────────────────────────────────────────────────
-
-class JobPostCreate(BaseModel):
-    title: str
-    company: str
-    location: Optional[str] = ""
-    description: Optional[str] = ""
-    requirements: Optional[List[str]] = []
-    salary: Optional[str] = ""
-    job_type: Optional[str] = "Full-time"
-
-
-class JobPostBulk(BaseModel):
-    jobs: List[JobPostCreate]
-
-
-def validate_job_post_payload(job: JobPostCreate) -> None:
-    required_fields = {
-        "title": job.title,
-        "company": job.company,
-        "location": job.location,
-        "description": job.description,
-        "salary": job.salary,
-        "job_type": job.job_type,
-    }
-    missing = [label for label, value in required_fields.items() if not str(value or "").strip()]
-    if missing:
-        pretty = ", ".join(field.replace("_", " ") for field in missing)
-        raise HTTPException(status_code=400, detail=f"Missing required job fields: {pretty}")
-    cleaned_requirements = [str(item).strip() for item in (job.requirements or []) if str(item).strip()]
-    if not cleaned_requirements:
-        raise HTTPException(status_code=400, detail="At least one skill or requirement is required")
-    job.requirements = cleaned_requirements
-
-
-async def build_job_post_doc(job: JobPostCreate, user: dict, job_cost: int, charge_tokens: bool = True) -> dict:
-    validate_job_post_payload(job)
-    if charge_tokens:
-        ok, msg = await deduct_tokens(user, job_cost)
-        if not ok:
-            raise HTTPException(status_code=402, detail=msg)
-        await log_token_usage(user, "job_generation", "job_generation", job_cost)
-
-    db_user = await db.users.find_one({"_id": to_object_id(user["_id"])})
-    if not db_user:
-        raise HTTPException(status_code=404, detail="User not found")
-
-    job_id = f"job_{uuid.uuid4().hex[:12]}"
-    content = f"{job.title} at {job.company}\n\n{job.description}"
-    if get_plan(db_user)["aiEnabled"] and GEMINI_API_KEY:
-        try:
-            model = genai.GenerativeModel("gemini-1.5-flash")
-            prompt = (f"Write a compelling social media job post for: {job.title} at {job.company}. "
-                      f"Location: {job.location or 'Remote'}. Type: {job.job_type}. "
-                      f"Salary: {job.salary or 'Competitive'}. "
-                      f"Requirements: {', '.join(job.requirements) if job.requirements else job.description}. "
-                      f"Keep it concise, engaging and under 280 words.")
-            response = model.generate_content(prompt)
-            content = response.text
-        except Exception as e:
-            logger.error(f"AI job content error: {e}")
-
-    return {
-        "job_id": job_id,
-        "user_id": str(db_user["_id"]),
-        "title": job.title.strip(),
-        "company": job.company.strip(),
-        "location": job.location.strip(),
-        "description": job.description.strip(),
-        "requirements": job.requirements,
-        "salary": job.salary.strip(),
-        "job_type": job.job_type.strip(),
-        "generated_content": content,
-        "can_export": get_plan(db_user)["jobExport"],
-        "tokens_used": job_cost if charge_tokens else 0,
-        "created_at": datetime.now(timezone.utc).isoformat(),
-        "updated_at": datetime.now(timezone.utc).isoformat(),
-    }
-
-@api_router.get("/job-posts")
-async def list_job_posts(user: dict = Depends(get_current_user)):
-    enforce_feature(user, "jobPosting")
-    posts = await db.job_posts.find({"user_id": {"$in": user_id_variants(user["_id"])}}, {"_id": 0}).to_list(100)
-    return [bson_safe(post) for post in posts]
-
-@api_router.post("/job-posts")
-async def create_job_post(job: JobPostCreate, user: dict = Depends(get_current_user)):
-    enforce_feature(user, "jobPosting")
-    if not check_rate_limit(str(user["_id"]), "job_create", 5):
-        raise HTTPException(status_code=429, detail="Too many requests. Please slow down.")
-    job_cost = TOKEN_COSTS["job_generation"]
-    doc = await build_job_post_doc(job, user, job_cost, charge_tokens=True)
-    await db.job_posts.insert_one(doc)
-    doc.pop("_id", None)
-    return bson_safe(doc)
-
-
-@api_router.post("/job-posts/bulk-create")
-async def bulk_create_job_posts(data: JobPostBulk, user: dict = Depends(get_current_user)):
-    enforce_feature(user, "jobPosting")
-    if not data.jobs:
-        raise HTTPException(status_code=400, detail="No job posts provided")
-
-    created = []
-    errors = []
-    for idx, job in enumerate(data.jobs, start=1):
-        try:
-            doc = await build_job_post_doc(job, user, TOKEN_COSTS["job_generation"], charge_tokens=True)
-            await db.job_posts.insert_one(doc)
-            doc.pop("_id", None)
-            created.append(bson_safe(doc))
-        except HTTPException as exc:
-            errors.append(f"Row {idx}: {exc.detail}")
-        except Exception as exc:
-            errors.append(f"Row {idx}: {exc}")
-
-    return {"created": created, "success": len(created), "failed": len(errors), "errors": errors}
-
+# Job posts feature removed.
 
 @api_router.put("/job-posts/{job_id}")
 async def update_job_post(job_id: str, job: JobPostCreate, user: dict = Depends(get_current_user)):

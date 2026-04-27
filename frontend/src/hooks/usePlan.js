@@ -51,8 +51,6 @@ export default function usePlan() {
     maxAccounts,
     tokens,
     canAI: isAdmin || !!plan?.aiEnabled,
-    canJobPost: isAdmin || !!plan?.jobPosting,
-    canJobExport: isAdmin || !!plan?.jobExport,
     canBulkUpload: isAdmin || !!plan?.bulkUpload,
     canAnalyticsDetailed: isAdmin || !!plan?.analyticsDetailed,
     canCustomRecurrence: isAdmin || !!plan?.customRecurrence,

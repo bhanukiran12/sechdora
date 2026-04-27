@@ -9,17 +9,15 @@ const BACKEND_URL = "/api";
 const API = "/api";
 
 const DEFAULT_PLANS = [
-  { id: "free", name: "Free", price: 0, maxAccounts: 1, maxPostsPerMonth: 10, aiEnabled: false, jobPosting: false, jobExport: false, prioritySupport: false },
-  { id: "pro", name: "Pro", price: 999, maxAccounts: 5, maxPostsPerMonth: 100, aiEnabled: true, jobPosting: true, jobExport: false, prioritySupport: false },
-  { id: "business", name: "Business", price: 2999, maxAccounts: 15, maxPostsPerMonth: "unlimited", aiEnabled: true, jobPosting: true, jobExport: true, prioritySupport: true },
+  { id: "free", name: "Free", price: 0, maxAccounts: 1, maxPostsPerMonth: 10, aiEnabled: false, prioritySupport: false },
+  { id: "pro", name: "Pro", price: 999, maxAccounts: 5, maxPostsPerMonth: 100, aiEnabled: true, prioritySupport: false },
+  { id: "business", name: "Business", price: 2999, maxAccounts: 15, maxPostsPerMonth: "unlimited", aiEnabled: true, prioritySupport: true },
 ];
 
 const FEATURES = [
   { key: "maxAccounts", label: "Connected Accounts", format: (v) => v },
   { key: "maxPostsPerMonth", label: "Posts / Month", format: (v) => v === "unlimited" ? "Unlimited" : v },
   { key: "aiEnabled", label: "AI Content Generation", bool: true },
-  { key: "jobPosting", label: "Job Posts Module", bool: true },
-  { key: "jobExport", label: "Job Post Export", bool: true },
   { key: "prioritySupport", label: "Priority Support", bool: true },
 ];
 
@@ -197,8 +195,6 @@ export default function PricingPage() {
                   </li>
                   {[
                     { key: "aiEnabled", label: "AI content generation" },
-                    { key: "jobPosting", label: "Job Posts module" },
-                    { key: "jobExport", label: "Job post export" },
                     { key: "prioritySupport", label: "Priority support" },
                   ].map(({ key, label }) => (
                     <li key={key} className={`flex items-center gap-2 text-sm font-bold ${!plan[key] ? (isBusiness ? "text-white/70" : "text-text-muted") : ""}`}>
