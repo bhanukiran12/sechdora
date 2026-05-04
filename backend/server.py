@@ -259,6 +259,58 @@ def get_org_key(user: dict) -> str:
 def bson_list(items: List[dict]) -> List[dict]:
     return [bson_safe(item) for item in items]
 
+
+def normalize_id_list(values: Optional[List[str]]) -> List[str]:
+    return list(dict.fromkeys([str(item) for item in (values or []) if str(item).strip()]))
+
+
+async def stash_org_trash(entity_type: str, payload: Dict[str, Any]) -> str:
+    trash_id = f"trash_{uuid.uuid4().hex[:12]}"
+    await db.org_trash.insert_one({
+        "trash_id": trash_id,
+        "entity_type": entity_type,
+        "payload": payload,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "expires_at": datetime.now(timezone.utc) + timedelta(hours=24),
+    })
+    return trash_id
+
+
+async def restore_org_trash_item(trash_id: str) -> dict:
+    trash = await db.org_trash.find_one({"trash_id": trash_id})
+    if not trash:
+        raise HTTPException(status_code=404, detail="Undo item not found or expired")
+
+    payload = trash.get("payload", {})
+    entity_type = trash.get("entity_type")
+
+    if entity_type == "department":
+        department = payload.get("department")
+        projects = payload.get("projects", [])
+        tasks = payload.get("tasks", [])
+        if department:
+            await db.departments.replace_one({"id": department["id"]}, department, upsert=True)
+        for project in projects:
+            await db.projects.replace_one({"id": project["id"]}, project, upsert=True)
+        for task in tasks:
+            await db.work_tasks.replace_one({"id": task["id"]}, task, upsert=True)
+    elif entity_type == "project":
+        project = payload.get("project")
+        tasks = payload.get("tasks", [])
+        if project:
+            await db.projects.replace_one({"id": project["id"]}, project, upsert=True)
+        for task in tasks:
+            await db.work_tasks.replace_one({"id": task["id"]}, task, upsert=True)
+    elif entity_type == "task":
+        task = payload.get("task")
+        if task:
+            await db.work_tasks.replace_one({"id": task["id"]}, task, upsert=True)
+    else:
+        raise HTTPException(status_code=400, detail="Unsupported undo item")
+
+    await db.org_trash.delete_one({"trash_id": trash_id})
+    return {"message": "Restored", "entity_type": entity_type}
+
 async def deduct_tokens(user, tokens):
     """Deduct tokens from user balance. Returns (success, message).
     Admin/owner accounts have unlimited credits and never get deducted — they
@@ -1004,12 +1056,25 @@ class DepartmentCreate(BaseModel):
     createdBy: Optional[str] = None
 
 
+class DepartmentUpdate(BaseModel):
+    name: Optional[str] = None
+    assignedVP: Optional[str] = None
+
+
 class ProjectCreate(BaseModel):
     name: str
     departmentId: Optional[str] = None
     managerId: Optional[str] = None
     teamLeadIds: List[str] = Field(default_factory=list)
     members: List[str] = Field(default_factory=list)
+
+
+class ProjectUpdate(BaseModel):
+    name: Optional[str] = None
+    departmentId: Optional[str] = None
+    managerId: Optional[str] = None
+    teamLeadIds: Optional[List[str]] = None
+    members: Optional[List[str]] = None
 
 
 class TaskCreate(BaseModel):
@@ -1020,6 +1085,18 @@ class TaskCreate(BaseModel):
     assignedBy: Optional[str] = None
     status: Optional[Literal["todo", "in-progress", "review", "done"]] = "todo"
     priority: Optional[Literal["low", "medium", "high", "urgent"]] = "medium"
+    dueDate: Optional[str] = None
+    linkedPostId: Optional[str] = None
+
+
+class TaskUpdate(BaseModel):
+    title: Optional[str] = None
+    description: Optional[str] = None
+    projectId: Optional[str] = None
+    assignedTo: Optional[str] = None
+    assignedBy: Optional[str] = None
+    status: Optional[Literal["todo", "in-progress", "review", "done"]] = None
+    priority: Optional[Literal["low", "medium", "high", "urgent"]] = None
     dueDate: Optional[str] = None
     linkedPostId: Optional[str] = None
 
@@ -2431,6 +2508,49 @@ async def create_department(data: DepartmentCreate, user: dict = Depends(get_cur
     return department
 
 
+@api_router.put("/departments/{department_id}")
+async def update_department(department_id: str, data: DepartmentUpdate, user: dict = Depends(get_current_user)):
+    role = normalize_role(user.get("role"))
+    if role not in {"admin", "vp"}:
+        raise HTTPException(status_code=403, detail="Only Admin and VP can edit departments")
+    existing = await db.departments.find_one({"id": department_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Department not found")
+    update_doc = {}
+    if data.name is not None:
+        update_doc["name"] = data.name.strip()
+    if data.assignedVP is not None:
+        if role != "admin" and data.assignedVP != user["_id"]:
+            raise HTTPException(status_code=403, detail="VP can only assign themselves")
+        update_doc["assignedVP"] = data.assignedVP
+    if update_doc:
+        update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.departments.update_one({"id": department_id}, {"$set": update_doc})
+    refreshed = await db.departments.find_one({"id": department_id}, {"_id": 0})
+    return refreshed
+
+
+@api_router.delete("/departments/{department_id}")
+async def delete_department(department_id: str, user: dict = Depends(get_current_user)):
+    role = normalize_role(user.get("role"))
+    if role not in {"admin", "vp"}:
+        raise HTTPException(status_code=403, detail="Only Admin and VP can delete departments")
+    existing = await db.departments.find_one({"id": department_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Department not found")
+    projects = await db.projects.find({"departmentId": department_id}, {"_id": 0}).to_list(500)
+    project_ids = [project["id"] for project in projects]
+    tasks = []
+    if project_ids:
+        tasks = await db.work_tasks.find({"projectId": {"$in": project_ids}}, {"_id": 0}).to_list(1000)
+        await db.work_tasks.delete_many({"projectId": {"$in": project_ids}})
+        await db.projects.delete_many({"id": {"$in": project_ids}})
+    await db.departments.delete_one({"id": department_id})
+    await log_audit(user["_id"], "org.department_deleted", "department", department_id, {"projectCount": len(project_ids)})
+    trash_id = await stash_org_trash("department", {"department": bson_safe(existing), "projects": bson_list(projects), "tasks": bson_list(tasks)})
+    return {"message": "Department deleted", "deletedProjects": len(project_ids), "trash_id": trash_id}
+
+
 @api_router.post("/projects")
 async def create_project(data: ProjectCreate, user: dict = Depends(get_current_user)):
     role = normalize_role(user.get("role"))
@@ -2458,6 +2578,56 @@ async def create_project(data: ProjectCreate, user: dict = Depends(get_current_u
     await log_audit(user["_id"], "org.project_created", "project", project_id, {"name": data.name, "departmentId": data.departmentId})
     project.pop("_id", None)
     return project
+
+
+@api_router.put("/projects/{project_id}")
+async def update_project(project_id: str, data: ProjectUpdate, user: dict = Depends(get_current_user)):
+    role = normalize_role(user.get("role"))
+    plan_caps = get_hierarchy_plan(user)
+    if role == "manager" and not plan_caps.get("manager_role"):
+        raise HTTPException(status_code=403, detail="Manager role is not available on your plan")
+    if role == "vp" and not plan_caps.get("full_hierarchy"):
+        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+    if role not in {"admin", "vp", "manager"}:
+        raise HTTPException(status_code=403, detail="Only Admin, VP, or Manager can edit projects")
+    existing = await db.projects.find_one({"id": project_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Project not found")
+    update_doc = {}
+    if data.name is not None:
+        update_doc["name"] = data.name.strip()
+    if data.departmentId is not None:
+        update_doc["departmentId"] = data.departmentId
+    if data.managerId is not None:
+        if role == "manager" and data.managerId != user["_id"]:
+            raise HTTPException(status_code=403, detail="Managers can only assign themselves as project owner")
+        update_doc["managerId"] = data.managerId
+    if data.teamLeadIds is not None:
+        update_doc["teamLeadIds"] = normalize_id_list(data.teamLeadIds)
+    if data.members is not None:
+        update_doc["members"] = normalize_id_list(data.members)
+    if update_doc:
+        update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.projects.update_one({"id": project_id}, {"$set": update_doc})
+    refreshed = await db.projects.find_one({"id": project_id}, {"_id": 0})
+    return refreshed
+
+
+@api_router.delete("/projects/{project_id}")
+async def delete_project(project_id: str, user: dict = Depends(get_current_user)):
+    role = normalize_role(user.get("role"))
+    if role not in {"admin", "vp", "manager"}:
+        raise HTTPException(status_code=403, detail="Only leaders can delete projects")
+    existing = await db.projects.find_one({"id": project_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Project not found")
+    tasks = await db.work_tasks.find({"projectId": project_id}, {"_id": 0}).to_list(1000)
+    task_count = await db.work_tasks.count_documents({"projectId": project_id})
+    await db.work_tasks.delete_many({"projectId": project_id})
+    await db.projects.delete_one({"id": project_id})
+    await log_audit(user["_id"], "org.project_deleted", "project", project_id, {"taskCount": task_count})
+    trash_id = await stash_org_trash("project", {"project": bson_safe(existing), "tasks": bson_list(tasks)})
+    return {"message": "Project deleted", "trash_id": trash_id}
 
 
 @api_router.post("/tasks")
@@ -2495,6 +2665,65 @@ async def create_task(data: TaskCreate, user: dict = Depends(get_current_user)):
     await log_audit(user["_id"], "org.task_created", "task", task_id, {"projectId": data.projectId, "assignedTo": data.assignedTo})
     task.pop("_id", None)
     return task
+
+
+@api_router.put("/tasks/{task_id}")
+async def update_task(task_id: str, data: TaskUpdate, user: dict = Depends(get_current_user)):
+    existing = await db.work_tasks.find_one({"id": task_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Task not found")
+    role = normalize_role(user.get("role"))
+    plan_caps = get_hierarchy_plan(user)
+    if role == "manager" and not plan_caps.get("manager_role"):
+        raise HTTPException(status_code=403, detail="Manager role is not available on your plan")
+    if role == "vp" and not plan_caps.get("full_hierarchy"):
+        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+    if role not in {"admin", "vp", "manager", "team_lead"}:
+        raise HTTPException(status_code=403, detail="Only leaders can edit tasks")
+
+    update_doc = {}
+    for key in ["title", "description", "projectId", "assignedTo", "assignedBy", "status", "priority", "dueDate", "linkedPostId"]:
+        value = getattr(data, key)
+        if value is not None:
+            update_doc[key] = value.strip() if isinstance(value, str) else value
+
+    if data.assignedTo is not None and role == "team_lead":
+        assignee = await db.users.find_one({"_id": ObjectId(data.assignedTo)})
+        if not assignee or normalize_role(assignee.get("role")) != "employee":
+            raise HTTPException(status_code=403, detail="Team Leads can only assign employees")
+
+    if data.status is not None and role == "employee" and data.status == "done":
+        raise HTTPException(status_code=403, detail="Employees cannot mark tasks as done")
+
+    if update_doc:
+        update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.work_tasks.update_one({"id": task_id}, {"$set": update_doc})
+
+    refreshed = await db.work_tasks.find_one({"id": task_id}, {"_id": 0})
+    return refreshed
+
+
+@api_router.delete("/tasks/{task_id}")
+async def delete_task(task_id: str, user: dict = Depends(get_current_user)):
+    role = normalize_role(user.get("role"))
+    if role not in {"admin", "vp", "manager", "team_lead"}:
+        raise HTTPException(status_code=403, detail="Only leaders can delete tasks")
+    existing = await db.work_tasks.find_one({"id": task_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Task not found")
+    await db.work_tasks.delete_one({"id": task_id})
+    await log_audit(user["_id"], "org.task_deleted", "task", task_id, {"projectId": existing.get("projectId")})
+    trash_id = await stash_org_trash("task", {"task": bson_safe(existing)})
+    return {"message": "Task deleted", "trash_id": trash_id}
+
+
+@api_router.post("/org/trash/{trash_id}/restore")
+async def restore_org_item(trash_id: str, user: dict = Depends(get_current_user)):
+    if normalize_role(user.get("role")) not in {"admin", "vp", "manager", "team_lead"}:
+        raise HTTPException(status_code=403, detail="Not allowed to restore items")
+    result = await restore_org_trash_item(trash_id)
+    await log_audit(user["_id"], "org.item_restored", result.get("entity_type", "unknown"), trash_id)
+    return result
 
 
 @api_router.put("/tasks/{task_id}/status")

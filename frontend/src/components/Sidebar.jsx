@@ -34,6 +34,7 @@ function TokenBadge({ tokens, isAdmin }) {
 export default function Sidebar({ active }) {
   const navigate = useNavigate();
   const [user, setUser] = useState(null);
+  const [orgSummary, setOrgSummary] = useState(null);
   const [mobileOpen, setMobileOpen] = useState(false);
 
   useEffect(() => {
@@ -43,7 +44,21 @@ export default function Sidebar({ active }) {
         const response = await axios.get(`${API}/auth/me`, {
           headers: { Authorization: `Bearer ${token}` }, withCredentials: true
         });
-        setUser(response.data);
+        const nextUser = response.data;
+        setUser(nextUser);
+        if (nextUser?.role && nextUser.role !== 'employee') {
+          try {
+            const orgRes = await axios.get(`${API}/org/hierarchy`, {
+              headers: { Authorization: `Bearer ${token}` },
+              withCredentials: true
+            });
+            setOrgSummary(orgRes.data);
+          } catch (error) {
+            setOrgSummary(null);
+          }
+        } else {
+          setOrgSummary(null);
+        }
       } catch (error) { /* silent */ }
     };
     fetchUser();
@@ -102,6 +117,35 @@ export default function Sidebar({ active }) {
       {user && (
         <div className="mb-4">
           <TokenBadge tokens={user.tokens} isAdmin={user?.role === 'admin' || user?.role === 'owner'} />
+        </div>
+      )}
+
+      {orgSummary && (
+        <div className="mb-4 rounded-xl border-2 border-black bg-pastel-blue/15 p-4 shadow-brutalSoft">
+          <div className="flex items-center justify-between gap-2">
+            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Org Snapshot</div>
+            <GitBranch className="h-4 w-4" />
+          </div>
+          <div className="mt-3 grid grid-cols-3 gap-2">
+            <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
+              <div className="text-lg font-black">{orgSummary.organization?.departmentCount || 0}</div>
+              <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Depts</div>
+            </div>
+            <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
+              <div className="text-lg font-black">{orgSummary.organization?.projectCount || 0}</div>
+              <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Projects</div>
+            </div>
+            <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
+              <div className="text-lg font-black">{orgSummary.organization?.taskCount || 0}</div>
+              <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Tasks</div>
+            </div>
+          </div>
+          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2">
+            <span className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Flow</span>
+            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-text-primary">
+              {user?.role || 'employee'} → work
+            </span>
+          </div>
         </div>
       )}
 
