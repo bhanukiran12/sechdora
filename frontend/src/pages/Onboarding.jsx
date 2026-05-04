@@ -10,7 +10,7 @@ const API = `/api`;
 const CREATOR_TYPES = [
   { id: "educator", label: "Educator", desc: "Online courses, tutorials, tips", icon: GraduationCap },
   { id: "creator", label: "Creator", desc: "Vlogs, content, entertainment", icon: SparkleIcon },
-  { id: "business", label: "Business", desc: "Brand, product, services", icon: BriefcaseBusiness }
+  { id: "business", label: "Team / Agency", desc: "Brand, product, services", icon: BriefcaseBusiness }
 ];
 
 const PLATFORMS = [

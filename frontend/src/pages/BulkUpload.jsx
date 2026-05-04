@@ -147,7 +147,7 @@ export default function BulkUpload() {
             </div>
             <h2 className="text-3xl font-black mb-3">Pro Feature</h2>
             <p className="text-text-secondary font-medium mb-6">
-              Bulk upload lets you schedule weeks of content in minutes.<br />Upgrade to Pro or Business to unlock it.
+              Bulk upload lets you schedule weeks of content in minutes.<br />Upgrade to Pro or Ultra Pro to unlock it.
             </p>
             <button
               onClick={() => navigate('/pricing')}

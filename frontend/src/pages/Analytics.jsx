@@ -48,7 +48,7 @@ export default function Analytics() {
 
   const handleExport = async () => {
     if (!canAnalyticsDetailed) {
-      setUpgradeModal({ open: true, message: "Upgrade to Pro or Business to export your analytics data." });
+      setUpgradeModal({ open: true, message: "Upgrade to Pro or Ultra Pro to export your analytics data." });
       return;
     }
     try {
@@ -109,7 +109,7 @@ export default function Analytics() {
             <div className="flex items-center gap-3">
               <Lock className="w-5 h-5 flex-shrink-0" strokeWidth={3} />
               <p className="font-bold text-sm">
-                You're on the <span className="uppercase">{planType}</span> plan. Upgrade to Pro or Business to unlock detailed analytics, platform breakdowns, and CSV export.
+                You're on the <span className="uppercase">{planType}</span> plan. Upgrade to Pro or Ultra Pro to unlock detailed analytics, platform breakdowns, and CSV export.
               </p>
             </div>
             <button

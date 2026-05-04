@@ -14,6 +14,7 @@ import Login from "@/pages/Login";
 import Dashboard from "@/pages/Dashboard";
 import PostCreator from "@/pages/PostCreator";
 import CalendarView from "@/pages/CalendarView";
+import ProductivityHub from "@/pages/ProductivityHub";
 import Analytics from "@/pages/Analytics";
 import OrganizationView from "@/pages/OrganizationView";
 import ConnectedAccounts from "@/pages/ConnectedAccounts";
@@ -126,6 +127,7 @@ function AppRouter() {
       <Route path="/terms" element={<TermsOfService />} />
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
+      <Route path="/productivity" element={<ProtectedRoute><ProductivityHub /></ProtectedRoute>} />
       <Route path="/posts/new" element={<ProtectedRoute><PostCreator /></ProtectedRoute>} />
       <Route path="/organization" element={<ProtectedRoute><OrganizationView /></ProtectedRoute>} />
       <Route path="/posts/schedule" element={<ProtectedRoute><CalendarView /></ProtectedRoute>} />

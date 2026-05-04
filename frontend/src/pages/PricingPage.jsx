@@ -2,7 +2,7 @@ import { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
-import { Check, X, Zap, Crown, Star } from "lucide-react";
+import { Check, X, Zap, Crown, Star, Shield } from "lucide-react";
 import SchedoraLogo from "@/components/SchedoraLogo";
 
 const BACKEND_URL = "/api";
@@ -11,7 +11,8 @@ const API = "/api";
 const DEFAULT_PLANS = [
   { id: "free", name: "Free", price: 0, maxAccounts: 1, maxPostsPerMonth: 10, aiEnabled: false, prioritySupport: false },
   { id: "pro", name: "Pro", price: 999, maxAccounts: 5, maxPostsPerMonth: 100, aiEnabled: true, prioritySupport: false },
-  { id: "business", name: "Business", price: 2999, maxAccounts: 15, maxPostsPerMonth: "unlimited", aiEnabled: true, prioritySupport: true },
+  { id: "ultra_pro", name: "Ultra Pro", price: 2999, maxAccounts: 15, maxPostsPerMonth: "unlimited", aiEnabled: true, prioritySupport: true },
+  { id: "organization", name: "Organization", price: 0, maxAccounts: "∞", maxPostsPerMonth: "unlimited", aiEnabled: true, prioritySupport: true },
 ];
 
 const FEATURES = [
@@ -64,6 +65,10 @@ export default function PricingPage() {
   const handleUpgrade = async (planId) => {
     if (!token) { navigate("/login"); return; }
     if (planId === "free") return;
+    if (planId === "organization") {
+      toast.info("Organization access is assigned by an admin.");
+      return;
+    }
     setPaying(planId);
     try {
       const loaded = await loadRazorpay();
@@ -111,9 +116,10 @@ export default function PricingPage() {
   };
 
   const planMeta = {
-    free:     { icon: Star,  color: "bg-white",   badge: null,             tagline: "For getting started",                              btnClass: "bg-white text-text-primary" },
-    pro:      { icon: Zap,   color: "bg-blue-50", badge: "Popular",        tagline: "For active individual users",                       btnClass: "bg-blue-600 text-white" },
-    business: { icon: Crown, color: "bg-primary", badge: "Best for teams", tagline: "Best suited for teams and higher usage needs", btnClass: "bg-black text-white" },
+    free:     { icon: Star,  color: "bg-white",   badge: null,              tagline: "Notes and a small todo queue",                   btnClass: "bg-white text-text-primary" },
+    pro:      { icon: Zap,   color: "bg-blue-50", badge: "Popular",         tagline: "Todo planning with scheduling",                  btnClass: "bg-blue-600 text-white" },
+    ultra_pro: { icon: Crown, color: "bg-primary/10", badge: "Ultra Pro",   tagline: "All productivity tools and docs",                btnClass: "bg-black text-white" },
+    organization: { icon: Shield, color: "bg-emerald-50", badge: "Separate plan", tagline: "Department, project, and org task management", btnClass: "bg-emerald-700 text-white" },
   };
 
   if (loading) {
@@ -133,74 +139,80 @@ export default function PricingPage() {
             <SchedoraLogo size="sm" />
           </button>
           <h1 className="text-4xl sm:text-5xl font-black tracking-tighter mb-4">
-            Plans that match your usage.
+            Plans for each workspace.
           </h1>
           <p className="text-text-secondary text-lg max-w-xl mx-auto">
-            Start free. Upgrade when your usage or team grows.
+            Keep social scheduling, productivity, and organization separate.
           </p>
           {(currentPlan?.planType || currentPlan?.plan?.planType) && (
             <div className="mt-4 inline-block bg-yellow-100 border-2 border-yellow-400 rounded-full px-5 py-2 font-bold text-sm text-yellow-800">
-              Current plan: {(currentPlan?.planType || currentPlan?.plan?.planType || 'free').charAt(0).toUpperCase() + (currentPlan?.planType || currentPlan?.plan?.planType || 'free').slice(1)}
+              Current plan: {(() => {
+                const current = currentPlan?.planType || currentPlan?.plan?.planType || "free";
+                if (current === "ultra_pro") return "Ultra Pro";
+                if (current === "organization") return "Organization";
+                return current.charAt(0).toUpperCase() + current.slice(1);
+              })()}
             </div>
           )}
         </div>
 
         
-        <div className="grid md:grid-cols-3 gap-6 mb-16">
+        <div className="grid md:grid-cols-2 xl:grid-cols-4 gap-6 mb-16">
           {Array.isArray(plans) && plans.length > 0 ? plans.map((plan) => {
             const meta = planMeta[plan.id] || planMeta.free;
             const Icon = meta.icon;
             const isCurrent = currentPlan?.planType === plan.id;
-            const isBusiness = plan.id === "business";
+            const isUltra = plan.id === "ultra_pro";
+            const isOrg = plan.id === "organization";
 
             return (
               <div
                 key={plan.id}
                 className={`relative border-4 border-black rounded-2xl p-6 flex flex-col ${meta.color} ${
-                  isBusiness ? "shadow-brutal-lg scale-105" : "shadow-brutal"
+                  isUltra || isOrg ? "shadow-brutal-lg scale-105" : "shadow-brutal"
                 } transition-transform`}
               >
                 {meta.badge && (
-                  <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 ${isBusiness ? "bg-primary" : "bg-blue-600"} text-white text-xs font-black border-2 border-black rounded-full whitespace-nowrap`}>
+                  <div className={`absolute -top-4 left-1/2 -translate-x-1/2 px-4 py-1 ${isOrg ? "bg-emerald-700" : "bg-blue-600"} text-white text-xs font-black border-2 border-black rounded-full whitespace-nowrap`}>
                     {meta.badge}
                   </div>
                 )}
 
-                <div className={`w-12 h-12 rounded-xl border-2 border-black flex items-center justify-center mb-4 ${isBusiness ? "bg-black" : "bg-white"} shadow-brutal-sm`}>
-                  <Icon className={`w-6 h-6 ${isBusiness ? "text-primary" : "text-text-primary"}`} strokeWidth={3} />
+                <div className={`w-12 h-12 rounded-xl border-2 border-black flex items-center justify-center mb-4 ${isUltra ? "bg-black" : isOrg ? "bg-emerald-700" : "bg-white"} shadow-brutal-sm`}>
+                  <Icon className={`w-6 h-6 ${isUltra ? "text-primary" : isOrg ? "text-white" : "text-text-primary"}`} strokeWidth={3} />
                 </div>
 
                 <h2 className="text-2xl font-black mb-1">{plan.name}</h2>
                 <div className="text-3xl font-black mb-1">
                   {plan.price === 0 ? "Free" : `₹${plan.price.toLocaleString()}`}
-                  {plan.price > 0 && <span className={`text-base font-bold ${isBusiness ? "text-white/80" : "text-text-secondary"}`}>/mo</span>}
+                  {plan.price > 0 && <span className={`text-base font-bold ${isUltra || isOrg ? "text-text-secondary" : "text-text-secondary"}`}>/mo</span>}
                 </div>
-                <div className={`text-sm mb-2 font-medium ${isBusiness ? "text-white/80" : "text-text-secondary"}`}>
+                <div className="text-sm mb-2 font-medium text-text-secondary">
                   {plan.price === 0 ? "Forever free" : "Billed monthly"}
                 </div>
                 {meta.tagline && (
-                  <div className={`text-xs font-bold mb-5 ${isBusiness ? "text-white/90" : "text-text-muted"}`}>
+                  <div className={`text-xs font-bold mb-5 ${isOrg ? "text-emerald-800" : "text-text-muted"}`}>
                     {meta.tagline}
                   </div>
                 )}
 
                 <ul className="space-y-2 flex-1 mb-6">
                   <li className="flex items-center gap-2 text-sm font-bold">
-                    <Check className={`w-4 h-4 shrink-0 ${isBusiness ? "text-white" : "text-green-600"}`} strokeWidth={3} />
+                    <Check className={`w-4 h-4 shrink-0 ${isOrg ? "text-emerald-700" : "text-green-600"}`} strokeWidth={3} />
                     {plan.maxAccounts} connected account{plan.maxAccounts !== 1 ? "s" : ""}
                   </li>
                   <li className="flex items-center gap-2 text-sm font-bold">
-                    <Check className={`w-4 h-4 shrink-0 ${isBusiness ? "text-white" : "text-green-600"}`} strokeWidth={3} />
+                    <Check className={`w-4 h-4 shrink-0 ${isOrg ? "text-emerald-700" : "text-green-600"}`} strokeWidth={3} />
                     {plan.maxPostsPerMonth === "unlimited" ? "Unlimited posts/month" : `${plan.maxPostsPerMonth} posts/month`}
                   </li>
                   {[
                     { key: "aiEnabled", label: "AI content generation" },
                     { key: "prioritySupport", label: "Priority support" },
                   ].map(({ key, label }) => (
-                    <li key={key} className={`flex items-center gap-2 text-sm font-bold ${!plan[key] ? (isBusiness ? "text-white/70" : "text-text-muted") : ""}`}>
+                    <li key={key} className={`flex items-center gap-2 text-sm font-bold ${!plan[key] ? "text-text-muted" : ""}`}>
                       {plan[key]
-                        ? <Check className={`w-4 h-4 shrink-0 ${isBusiness ? "text-white" : "text-green-600"}`} strokeWidth={3} />
-                        : <X className={`w-4 h-4 shrink-0 ${isBusiness ? "text-white/70" : "text-text-muted"}`} strokeWidth={3} />
+                        ? <Check className={`w-4 h-4 shrink-0 ${isOrg ? "text-emerald-700" : "text-green-600"}`} strokeWidth={3} />
+                        : <X className="w-4 h-4 shrink-0 text-text-muted" strokeWidth={3} />
                       }
                       {label}
                     </li>
@@ -209,14 +221,15 @@ export default function PricingPage() {
 
                 <button
                   onClick={() => handleUpgrade(plan.id)}
-                  disabled={isCurrent || plan.id === "free" || paying === plan.id}
+                  disabled={isCurrent || plan.id === "free" || plan.id === "organization" || paying === plan.id}
                   className={`w-full brutal-button py-3 font-black text-sm ${meta.btnClass} ${
                     isCurrent ? "opacity-60 cursor-default" : ""
                   }`}
                 >
                   {paying === plan.id ? "Processing..." :
                    isCurrent ? "Current Plan" :
-                   plan.id === "free" ? "Free Forever" :
+                  plan.id === "free" ? "Free Forever" :
+                  plan.id === "organization" ? "Admin assigned" :
                    `Upgrade to ${plan.name}`}
                 </button>
               </div>

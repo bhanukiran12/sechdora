@@ -200,6 +200,13 @@ ROLE_ALIASES = {
 
 ROLE_HIERARCHY = ["admin", "vp", "manager", "team_lead", "employee"]
 ADMIN_ROLES = {"admin", "owner"}
+PLAN_ALIASES = {
+    "business": "ultra_pro",
+    "ultra": "ultra_pro",
+    "ultra_pro": "ultra_pro",
+    "org": "organization",
+    "organization": "organization",
+}
 
 ROLE_ACCESS = {
     "admin": {"all": True},
@@ -212,7 +219,8 @@ ROLE_ACCESS = {
 PLAN_HIERARCHY = {
     "free": {"max_team_size": 1, "manager_role": False, "full_hierarchy": False},
     "pro": {"max_team_size": 5, "manager_role": True, "full_hierarchy": False},
-    "business": {"max_team_size": None, "manager_role": True, "full_hierarchy": True},
+    "ultra_pro": {"max_team_size": None, "manager_role": True, "full_hierarchy": False},
+    "organization": {"max_team_size": None, "manager_role": True, "full_hierarchy": True},
 }
 
 TASK_STATUS_FLOW = ["todo", "in-progress", "review", "done"]
@@ -220,6 +228,11 @@ TASK_STATUS_FLOW = ["todo", "in-progress", "review", "done"]
 
 def normalize_role(role: Optional[str]) -> str:
     return ROLE_ALIASES.get(str(role or "").lower(), "employee")
+
+
+def normalize_plan_type(plan_type: Optional[str]) -> str:
+    raw = str(plan_type or "free").lower()
+    return PLAN_ALIASES.get(raw, raw)
 
 
 def role_rank(role: Optional[str]) -> int:
@@ -249,7 +262,7 @@ def can_access_hierarchy(user: dict) -> bool:
 
 
 def get_hierarchy_plan(user: dict) -> dict:
-    return PLAN_HIERARCHY.get(user.get("planType", "free"), PLAN_HIERARCHY["free"])
+    return PLAN_HIERARCHY.get(normalize_plan_type(user.get("planType")), PLAN_HIERARCHY["free"])
 
 
 def get_org_key(user: dict) -> str:
@@ -350,6 +363,7 @@ PLANS = {
         "prioritySupport": False, "bulkUpload": False,
         "analyticsDetailed": False, "customRecurrence": False,
         "managerRoleEnabled": False, "fullHierarchy": False,
+        "productivityNotes": True, "todoLimit": 10, "taskScheduling": False, "docs": False, "orgTools": False,
     },
     "pro": {
         "name": "Pro", "price": 999,
@@ -358,14 +372,25 @@ PLANS = {
         "prioritySupport": False, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
         "managerRoleEnabled": True, "fullHierarchy": False,
+        "productivityNotes": True, "todoLimit": 50, "taskScheduling": True, "docs": False, "orgTools": False,
     },
-    "business": {
-        "name": "Business", "price": 2999,
+    "ultra_pro": {
+        "name": "Ultra Pro", "price": 2999,
         "maxAccounts": 15, "maxPostsPerMonth": None, "maxPlatforms": 10,
         "aiEnabled": True,
         "prioritySupport": True, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
+        "managerRoleEnabled": True, "fullHierarchy": False,
+        "productivityNotes": True, "todoLimit": None, "taskScheduling": True, "docs": True, "orgTools": False,
+    },
+    "organization": {
+        "name": "Organization", "price": 0,
+        "maxAccounts": 9999, "maxPostsPerMonth": None, "maxPlatforms": 9999,
+        "aiEnabled": True,
+        "prioritySupport": True, "bulkUpload": False,
+        "analyticsDetailed": True, "customRecurrence": True,
         "managerRoleEnabled": True, "fullHierarchy": True,
+        "productivityNotes": False, "todoLimit": None, "taskScheduling": False, "docs": False, "orgTools": True,
     },
 }
 
@@ -376,6 +401,7 @@ ADMIN_PLAN = {
     "prioritySupport": True, "bulkUpload": True,
     "analyticsDetailed": True, "customRecurrence": True,
     "managerRoleEnabled": True, "fullHierarchy": True,
+    "productivityNotes": True, "todoLimit": None, "taskScheduling": True, "docs": True, "orgTools": True,
 }
 
 # SMTP Config (Netlify/GoDaddy/ForwardEmail)
@@ -796,7 +822,7 @@ async def linkedin_upload_image(token: str, owner_urn: str, media_url: str) -> s
 def get_plan(user: dict) -> dict:
     if normalize_role(user.get("role")) == "admin":
         return ADMIN_PLAN
-    return PLANS.get(user.get("planType", "free"), PLANS["free"])
+    return PLANS.get(normalize_plan_type(user.get("planType")), PLANS["free"])
 
 async def enforce_account_limit(user: dict):
     if normalize_role(user.get("role")) == "admin":
@@ -836,7 +862,7 @@ def enforce_feature(user: dict, feature: str):
             "analyticsDetailed": "Detailed analytics",
             "customRecurrence": "Custom repeat intervals",
         }
-        plan_needed = "Pro or Business"
+        plan_needed = "Pro or Ultra Pro"
         raise HTTPException(status_code=403, detail={
             "code": "feature_locked",
             "message": f"Upgrade to {plan_needed} to access {feature_names.get(feature, feature)}.",
@@ -2391,6 +2417,22 @@ async def invite_team_member(invite: TeamInvite, user: dict = Depends(get_curren
     await log_audit(user["_id"], "team.invite_sent", "team_invitation", token, {"email": invite.email, "role": invite_role})
     return {"message": "Invitation sent", "token": token}
 
+
+class AdminRoleUpdate(BaseModel):
+    role: Literal["admin", "vp", "manager", "team_lead", "employee"]
+
+
+@api_router.put("/admin/users/{user_id}/role")
+async def admin_update_user_role(user_id: str, data: AdminRoleUpdate, user: dict = Depends(get_current_user)):
+    if normalize_role(user.get("role")) != "admin":
+        raise HTTPException(status_code=403, detail="Admin access required")
+    target = await db.users.find_one({"_id": ObjectId(user_id)})
+    if not target:
+        raise HTTPException(status_code=404, detail="User not found")
+    await db.users.update_one({"_id": ObjectId(user_id)}, {"$set": {"role": data.role, "updated_at": datetime.now(timezone.utc).isoformat()}})
+    await log_audit(user["_id"], "admin.user_role_updated", "user", user_id, {"role": data.role})
+    return {"message": "Role updated", "user_id": user_id, "role": data.role}
+
 @api_router.post("/teams/accept-invite")
 async def accept_invite(token: str, user: dict = Depends(get_current_user)):
     invite = await db.team_invitations.find_one({"token": token})
@@ -2489,7 +2531,7 @@ async def create_department(data: DepartmentCreate, user: dict = Depends(get_cur
     role = normalize_role(user.get("role"))
     plan_caps = get_hierarchy_plan(user)
     if role == "vp" and not plan_caps.get("full_hierarchy"):
-        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+        raise HTTPException(status_code=403, detail="VP access is only available on the Organization plan")
     if role not in {"admin", "vp"}:
         raise HTTPException(status_code=403, detail="Only Admin and VP can create departments")
     department_id = f"dept_{uuid.uuid4().hex[:10]}"
@@ -2558,7 +2600,7 @@ async def create_project(data: ProjectCreate, user: dict = Depends(get_current_u
     if role == "manager" and not plan_caps.get("manager_role"):
         raise HTTPException(status_code=403, detail="Manager role is not available on your plan")
     if role == "vp" and not plan_caps.get("full_hierarchy"):
-        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+        raise HTTPException(status_code=403, detail="VP access is only available on the Organization plan")
     if role not in {"admin", "vp", "manager"}:
         raise HTTPException(status_code=403, detail="Only Admin, VP, or Manager can create projects")
     project_id = f"proj_{uuid.uuid4().hex[:10]}"
@@ -2587,7 +2629,7 @@ async def update_project(project_id: str, data: ProjectUpdate, user: dict = Depe
     if role == "manager" and not plan_caps.get("manager_role"):
         raise HTTPException(status_code=403, detail="Manager role is not available on your plan")
     if role == "vp" and not plan_caps.get("full_hierarchy"):
-        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+        raise HTTPException(status_code=403, detail="VP access is only available on the Organization plan")
     if role not in {"admin", "vp", "manager"}:
         raise HTTPException(status_code=403, detail="Only Admin, VP, or Manager can edit projects")
     existing = await db.projects.find_one({"id": project_id})
@@ -2635,9 +2677,9 @@ async def create_task(data: TaskCreate, user: dict = Depends(get_current_user)):
     role = normalize_role(user.get("role"))
     plan_caps = get_hierarchy_plan(user)
     if role == "vp" and not plan_caps.get("full_hierarchy"):
-        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+        raise HTTPException(status_code=403, detail="VP access is only available on the Organization plan")
     if role == "team_lead" and not plan_caps.get("full_hierarchy"):
-        raise HTTPException(status_code=403, detail="Team Lead access is only available on the Business plan")
+        raise HTTPException(status_code=403, detail="Team Lead access is only available on the Organization plan")
     if role == "manager" and not plan_caps.get("manager_role"):
         raise HTTPException(status_code=403, detail="Manager role is not available on your plan")
     if role not in {"admin", "vp", "manager", "team_lead"}:
@@ -2677,7 +2719,7 @@ async def update_task(task_id: str, data: TaskUpdate, user: dict = Depends(get_c
     if role == "manager" and not plan_caps.get("manager_role"):
         raise HTTPException(status_code=403, detail="Manager role is not available on your plan")
     if role == "vp" and not plan_caps.get("full_hierarchy"):
-        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+        raise HTTPException(status_code=403, detail="VP access is only available on the Organization plan")
     if role not in {"admin", "vp", "manager", "team_lead"}:
         raise HTTPException(status_code=403, detail="Only leaders can edit tasks")
 
@@ -3540,7 +3582,7 @@ async def seed_admin():
     admin_password = os.environ.get("ADMIN_PASSWORD", "admin123")
     existing = await db.users.find_one({"email": admin_email})
     if existing is None:
-        await db.users.insert_one({"_id": ObjectId(), "email": admin_email, "password_hash": hash_password(admin_password), "name": "Admin", "role": "admin", "team_id": None, "onboarding_completed": True, "creator_type": "business", "planType": "business", "subscriptionStatus": "active", "preferred_platforms": ["instagram", "linkedin", "twitter"], "settings": {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True}, "created_at": datetime.now(timezone.utc).isoformat()})
+        await db.users.insert_one({"_id": ObjectId(), "email": admin_email, "password_hash": hash_password(admin_password), "name": "Admin", "role": "admin", "team_id": None, "onboarding_completed": True, "creator_type": "business", "planType": "ultra_pro", "subscriptionStatus": "active", "preferred_platforms": ["linkedin", "twitter"], "settings": {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True}, "created_at": datetime.now(timezone.utc).isoformat()})
         logger.info(f"Admin user created: {admin_email}")
     else:
         update = {}
@@ -3553,7 +3595,7 @@ async def seed_admin():
         if "settings" not in existing:
             update["settings"] = {"auto_retry_failed": True, "email_on_failure": True, "email_weekly_digest": True}
         if "planType" not in existing:
-            update["planType"] = "business"
+            update["planType"] = "ultra_pro"
         if "subscriptionStatus" not in existing:
             update["subscriptionStatus"] = "active"
         if update:
@@ -3614,7 +3656,7 @@ async def get_user_plan(user: dict = Depends(get_current_user)):
     plan = get_plan(user)
     is_admin = normalize_role(user.get("role")) == "admin"
     connected = await db.social_accounts.count_documents({"user_id": user["_id"], "status": "connected"})
-    plan_type = "admin" if is_admin else user.get("planType", "free")
+    plan_type = "admin" if is_admin else normalize_plan_type(user.get("planType", "free"))
     return {
         "planType": plan_type,
         "isAdmin": is_admin,
@@ -3634,9 +3676,9 @@ class CreateOrderRequest(BaseModel):
 async def create_razorpay_order(data: CreateOrderRequest, user: dict = Depends(get_current_user)):
     if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
         raise HTTPException(status_code=503, detail="Payment service not configured. Set RAZORPAY_KEY_ID and RAZORPAY_KEY_SECRET.")
-    if data.plan not in ["pro", "business"]:
+    if normalize_plan_type(data.plan) not in ["pro", "ultra_pro"]:
         raise HTTPException(status_code=400, detail="Invalid plan selected")
-    plan = PLANS[data.plan]
+    plan = PLANS[normalize_plan_type(data.plan)]
     client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
     order = client_rz.order.create({
         "amount": plan["price"] * 100,
@@ -3656,7 +3698,7 @@ class VerifyPaymentRequest(BaseModel):
 async def verify_payment(data: VerifyPaymentRequest, user: dict = Depends(get_current_user)):
     if not RAZORPAY_KEY_SECRET:
         raise HTTPException(status_code=503, detail="Payment service not configured")
-    if data.plan not in ["pro", "business"]:
+    if normalize_plan_type(data.plan) not in ["pro", "ultra_pro"]:
         raise HTTPException(status_code=400, detail="Invalid plan")
     try:
         client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
@@ -3668,17 +3710,18 @@ async def verify_payment(data: VerifyPaymentRequest, user: dict = Depends(get_cu
     except Exception:
         raise HTTPException(status_code=400, detail="Payment verification failed. Please contact support.")
     expiry = datetime.now(timezone.utc) + timedelta(days=30)
+    plan_type = normalize_plan_type(data.plan)
     await db.users.update_one(
         {"_id": ObjectId(user["_id"])},
-        {"$set": {"planType": data.plan, "subscriptionStatus": "active", "planExpiryDate": expiry.isoformat(), "postsUsedThisMonth": 0}}
+        {"$set": {"planType": plan_type, "subscriptionStatus": "active", "planExpiryDate": expiry.isoformat(), "postsUsedThisMonth": 0}}
     )
     await db.payments.insert_one({
-        "user_id": user["_id"], "plan": data.plan, "amount": PLANS[data.plan]["price"],
+        "user_id": user["_id"], "plan": plan_type, "amount": PLANS[plan_type]["price"],
         "razorpay_order_id": data.razorpay_order_id, "razorpay_payment_id": data.razorpay_payment_id,
         "created_at": datetime.now(timezone.utc).isoformat(),
     })
-    logger.info(f"Payment verified for user {user['_id']}: upgraded to {data.plan}")
-    return {"success": True, "plan": data.plan, "message": f"Successfully upgraded to {PLANS[data.plan]['name']} plan!"}
+    logger.info(f"Payment verified for user {user['_id']}: upgraded to {plan_type}")
+    return {"success": True, "plan": plan_type, "message": f"Successfully upgraded to {PLANS[plan_type]['name']} plan!"}
 
 
 # Job posts feature removed.

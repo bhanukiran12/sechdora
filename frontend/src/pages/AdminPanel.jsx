@@ -11,6 +11,7 @@ export default function AdminPanel() {
   const [pendingPosts, setPendingPosts] = useState([]);
   const [inviteEmail, setInviteEmail] = useState("");
   const [inviteRole, setInviteRole] = useState("employee");
+  const [roleDrafts, setRoleDrafts] = useState({});
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
@@ -31,6 +32,7 @@ export default function AdminPanel() {
 
       setUser(userRes.data);
       setTeamMembers(membersRes.data);
+      setRoleDrafts(Object.fromEntries(membersRes.data.map((member) => [member._id, member.role])));
       setPendingPosts(postsRes.data);
       setLoading(false);
     } catch (error) {
@@ -73,6 +75,23 @@ export default function AdminPanel() {
     }
   };
 
+  const handleRoleUpdate = async (memberId) => {
+    const nextRole = roleDrafts[memberId];
+    if (!nextRole) return;
+    try {
+      const token = localStorage.getItem('access_token');
+      await axios.put(
+        `${API}/admin/users/${memberId}/role`,
+        { role: nextRole },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      toast.success("Role updated");
+      fetchData();
+    } catch (error) {
+      toast.error(error.response?.data?.detail || "Failed to update role");
+    }
+  };
+
   if (loading) {
     return (
       <div className="flex">
@@ -106,14 +125,14 @@ export default function AdminPanel() {
           <h1 className="text-4xl sm:text-5xl font-black font-heading tracking-tighter mb-2" data-testid="admin-heading">
             Admin Panel
           </h1>
-          <p className="text-base text-text-secondary">Manage your team and content</p>
+          <p className="text-base text-text-secondary">Create roles, move people between roles, and keep review lanes clean.</p>
         </div>
 
         {/* Team Invitations */}
         <div className="brutal-card p-6 mb-8" data-testid="invite-section">
           <div className="flex items-center gap-3 mb-6">
             <Mail className="w-6 h-6" strokeWidth={3} />
-            <h2 className="text-2xl font-bold font-heading">Invite Team Member</h2>
+            <h2 className="text-2xl font-bold font-heading">Invite team member</h2>
           </div>
 
           <form onSubmit={handleInvite} className="grid md:grid-cols-3 gap-4">
@@ -140,7 +159,6 @@ export default function AdminPanel() {
                 <option value="team_lead">Team Lead</option>
                 <option value="manager">Manager</option>
                 <option value="vp">VP</option>
-                <option value="admin">Admin</option>
               </select>
 
               <button
@@ -158,7 +176,7 @@ export default function AdminPanel() {
         <div className="brutal-card p-6 mb-8" data-testid="team-members-section">
           <div className="flex items-center gap-3 mb-6">
             <Users className="w-6 h-6" strokeWidth={3} />
-            <h2 className="text-2xl font-bold font-heading">Team Members ({teamMembers.length})</h2>
+            <h2 className="text-2xl font-bold font-heading">Team members ({teamMembers.length})</h2>
           </div>
 
           {teamMembers.length === 0 ? (
@@ -175,7 +193,7 @@ export default function AdminPanel() {
                     <div className="font-bold">{member.name}</div>
                     <div className="text-sm text-text-muted">{member.email}</div>
                   </div>
-                  <div className="flex items-center gap-3">
+                  <div className="flex flex-wrap items-center gap-3">
                     <span className={`text-xs tracking-[0.2em] uppercase font-bold px-3 py-1 border border-border rounded ${
                       member.role === 'admin' ? 'bg-primary text-white' :
                       member.role === 'vp' ? 'bg-pastel-blue' :
@@ -185,6 +203,24 @@ export default function AdminPanel() {
                     }`}>
                       {member.role}
                     </span>
+                    <select
+                      value={roleDrafts[member._id] || member.role}
+                      onChange={(e) => setRoleDrafts((prev) => ({ ...prev, [member._id]: e.target.value }))}
+                      className="brutal-input min-w-36 py-2 text-sm"
+                    >
+                      <option value="employee">Employee</option>
+                      <option value="team_lead">Team Lead</option>
+                      <option value="manager">Manager</option>
+                      <option value="vp">VP</option>
+                      <option value="admin">Admin</option>
+                    </select>
+                    <button
+                      type="button"
+                      onClick={() => handleRoleUpdate(member._id)}
+                      className="brutal-button bg-primary text-white text-xs px-4 py-2"
+                    >
+                      Move role
+                    </button>
                   </div>
                 </div>
               ))}

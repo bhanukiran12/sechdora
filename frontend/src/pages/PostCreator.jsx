@@ -482,7 +482,7 @@ export default function PostCreator() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => setUpgradeModal({ open: true, message: "Upgrade to Pro or Business to use AI content generation." })}
+                    onClick={() => setUpgradeModal({ open: true, message: "Upgrade to Pro or Ultra Pro to use AI content generation." })}
                     className="flex items-center gap-2 text-sm font-bold text-text-muted hover:text-primary transition-colors"
                     data-testid="improve-caption-button"
                   >
@@ -619,7 +619,7 @@ export default function PostCreator() {
                   </button>
                 ) : (
                   <button
-                    onClick={() => setUpgradeModal({ open: true, message: "Upgrade to Pro or Business to set custom repeat intervals." })}
+                    onClick={() => setUpgradeModal({ open: true, message: "Upgrade to Pro or Ultra Pro to set custom repeat intervals." })}
                     className="px-4 py-2 rounded-full border-2 border-dashed border-border font-medium text-sm text-text-muted flex items-center gap-1"
                     data-testid="recurrence-custom"
                   >

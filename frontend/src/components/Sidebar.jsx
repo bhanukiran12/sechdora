@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins, GitBranch } from "lucide-react";
+import { LayoutDashboard, Calendar, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins, GitBranch, NotebookPen, ListTodo } from "lucide-react";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -66,16 +66,24 @@ export default function Sidebar({ active }) {
 
   const menuItems = [
     { id: 'dashboard', label: 'Dashboard', icon: LayoutDashboard, path: '/dashboard' },
+    { id: 'productivity', label: 'Productivity', icon: NotebookPen, path: '/productivity' },
     { id: 'schedule', label: 'Calendar', icon: Calendar, path: '/posts/schedule' },
-    { id: 'bulk', label: 'Bulk Upload', icon: Upload, path: '/posts/bulk-upload' },
-    { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
-    { id: 'accounts', label: 'Accounts', icon: Settings, path: '/settings/accounts' },
     { id: 'tokens', label: 'Credits', icon: Coins, path: '/tokens' },
     { id: 'pricing', label: 'Pricing', icon: Zap, path: '/pricing' },
   ];
 
+  const scheduleRailItems = [
+    { id: 'bulk', label: 'Bulk Upload', icon: Upload, path: '/posts/bulk-upload' },
+    { id: 'analytics', label: 'Analytics', icon: BarChart3, path: '/analytics' },
+    { id: 'accounts', label: 'Accounts', icon: Settings, path: '/settings/accounts' },
+  ];
+
   if (user?.role !== 'employee') {
     menuItems.splice(1, 0, { id: 'organization', label: 'Org View', icon: GitBranch, path: '/organization' });
+  }
+
+  if (user?.planType === 'organization' || user?.role === 'admin') {
+    menuItems.splice(2, 0, { id: 'org-tasks', label: 'Org Tasks', icon: ListTodo, path: '/organization' });
   }
 
   if (user?.role === 'admin' || user?.role === 'owner') {
@@ -145,6 +153,28 @@ export default function Sidebar({ active }) {
             <span className="text-[10px] font-black uppercase tracking-[0.18em] text-text-primary">
               {user?.role || 'employee'} → work
             </span>
+          </div>
+        </div>
+      )}
+
+      {active === 'schedule' && (
+        <div className="mb-4 rounded-xl border border-border bg-white p-3 shadow-brutal">
+          <div className="mb-2 text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Schedule tools</div>
+          <div className="flex gap-2 overflow-x-auto pb-1">
+            {scheduleRailItems.map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.id}
+                  type="button"
+                  onClick={() => handleNav(item.path)}
+                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-gray-50 px-3 py-2 text-[11px] font-semibold text-text-primary shadow-brutal transition hover:-translate-y-0.5"
+                >
+                  <Icon className="h-3.5 w-3.5 text-primary" />
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
         </div>
       )}

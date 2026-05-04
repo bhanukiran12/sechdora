@@ -83,7 +83,7 @@ const FAQS = [
   },
   {
     q: "Which platforms does it support?",
-    a: "Schedora supports posting to major social platforms such as Instagram and LinkedIn today, with additional integrations available on the Business plan.",
+    a: "Schedora supports posting to major social platforms such as LinkedIn and X today, with team organization features available separately.",
   },
   {
     q: "How does the token system work?",
@@ -95,7 +95,7 @@ const FAQS = [
   },
   {
     q: "Is Schedora suitable for small teams?",
-    a: "Yes. The Business plan is designed for teams and higher usage needs, with advanced workflows and additional platform integrations.",
+    a: "Yes. Ultra Pro is designed for productivity and advanced workflows, while Organization is kept separate for team structure and access control.",
   },
 ];
 
@@ -161,7 +161,7 @@ function useLandingSeo() {
         {
           "@type": "SoftwareApplication",
           name: "Schedora",
-          applicationCategory: "BusinessApplication",
+          applicationCategory: "WebApplication",
           operatingSystem: "Web",
           description: "Structured workflow platform for content and outreach.",
         },

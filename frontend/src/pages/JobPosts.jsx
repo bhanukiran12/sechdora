@@ -208,7 +208,7 @@ export default function JobPosts() {
   const handleCreate = async (e) => {
     e.preventDefault();
     if (!planInfo?.plan?.jobPosting) {
-      setUpgradeModal({ open: true, message: "Upgrade to Pro or Business to create job posts." });
+      setUpgradeModal({ open: true, message: "Upgrade to Pro or Ultra Pro to create job posts." });
       return;
     }
 
@@ -274,7 +274,7 @@ export default function JobPosts() {
 
   const handleExport = async (job) => {
     if (!planInfo?.plan?.jobExport) {
-      setUpgradeModal({ open: true, message: "Upgrade to Business plan to export job posts." });
+      setUpgradeModal({ open: true, message: "Upgrade to Ultra Pro to export job posts." });
       return;
     }
     try {
@@ -439,7 +439,7 @@ export default function JobPosts() {
           {planInfo && (
             <div className="mb-6 flex flex-wrap items-center gap-3">
               <div className={`inline-flex items-center gap-2 rounded-full border-2 border-black px-4 py-2 text-sm font-bold ${
-                planInfo.planType === "business" ? "bg-primary text-white" :
+                planInfo.planType === "ultra_pro" ? "bg-primary text-white" :
                 planInfo.planType === "pro" ? "bg-blue-100 text-blue-800" :
                 "bg-gray-100 text-gray-700"
               }`}>
@@ -454,10 +454,10 @@ export default function JobPosts() {
               <Lock className="mx-auto mb-4 h-16 w-16 text-text-muted" />
               <h2 className="mb-2 text-2xl font-black">Job Posts Locked</h2>
               <p className="mb-6 text-text-secondary">
-                Upgrade to Pro or Business to create and manage job posts.
+                Upgrade to Pro or Ultra Pro to create and manage job posts.
               </p>
               <button
-                onClick={() => setUpgradeModal({ open: true, message: "Upgrade to Pro or Business to access Job Posts." })}
+                onClick={() => setUpgradeModal({ open: true, message: "Upgrade to Pro or Ultra Pro to access Job Posts." })}
                 className="brutal-button bg-primary text-white font-black"
               >
                 View Pricing Plans

@@ -58,5 +58,9 @@ export default function usePlan() {
     canCustomRecurrence: isAdmin || !!plan?.customRecurrence,
     canManagerRoles: isAdmin || !!plan?.managerRoleEnabled,
     hasFullHierarchy: isAdmin || !!plan?.fullHierarchy,
+    canProductivityNotes: isAdmin || !!plan?.productivityNotes,
+    canTodoScheduling: isAdmin || !!plan?.taskScheduling,
+    canDocs: isAdmin || !!plan?.docs,
+    hasOrgTools: isAdmin || !!plan?.orgTools,
   };
 }

@@ -68,7 +68,7 @@ export default function UpgradeModal({ isOpen, onClose, message, feature }) {
                 {[
                   { name: "Free", accent: "bg-white", note: "Solo workflow", cta: "Stay Free" },
                   { name: "Pro", accent: "bg-blue-50", note: "Small teams", cta: "See Pro" },
-                  { name: "Business", accent: "bg-primary/10 ring-2 ring-primary", note: "Recommended", cta: "Go Business" },
+                  { name: "Ultra Pro", accent: "bg-primary/10 ring-2 ring-primary", note: "Recommended", cta: "Go Ultra Pro" },
                 ].map((plan) => (
                   <div key={plan.name} className={`rounded-[24px] border border-border p-4 shadow-brutal ${plan.accent}`}>
                     <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">{plan.name}</div>

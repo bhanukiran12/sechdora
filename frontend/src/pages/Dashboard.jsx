@@ -274,18 +274,18 @@ export default function Dashboard() {
   }
 
   const statCards = [
-    { label: 'Total Posts', value: analytics?.total_posts || 0, icon: Target, color: 'bg-pastel-pink', note: 'All posts in the workspace' },
-    { label: 'Published Posts', value: analytics?.published_posts || 0, icon: Zap, color: 'bg-pastel-blue', note: 'Live across connected channels' },
-    { label: 'Scheduled Posts', value: analytics?.scheduled_posts || 0, icon: Calendar, color: 'bg-pastel-yellow', note: 'Queued and waiting to publish' },
-    { label: 'Connected Accounts', value: analytics?.connected_accounts || accounts.length || 0, icon: Users, color: 'bg-aiAccent', note: 'Active social logins' }
+    { label: 'Work planned', value: analytics?.scheduled_posts || 0, icon: Target, color: 'bg-pastel-pink', note: 'Tasks and posts waiting to move' },
+    { label: 'Work shipped', value: analytics?.published_posts || 0, icon: Zap, color: 'bg-pastel-blue', note: 'Client-ready output already live' },
+    { label: 'Queue depth', value: analytics?.total_posts || 0, icon: Calendar, color: 'bg-pastel-yellow', note: 'All active work in the system' },
+    { label: 'Delivery lanes', value: analytics?.connected_accounts || accounts.length || 0, icon: Users, color: 'bg-aiAccent', note: 'Connected channels for publishing' }
   ];
 
   const roleCopy = {
-    admin: { label: "Admin", note: "Full control of billing, teams, and analytics.", action: "Open Org View", path: "/organization" },
-    vp: { label: "VP", note: "Strategic oversight across departments and managers.", action: "Review Hierarchy", path: "/organization" },
-    manager: { label: "Manager", note: "Own projects, assign leads, and track delivery.", action: "Open Org View", path: "/organization" },
-    team_lead: { label: "Team Lead", note: "Assign tasks and keep the team moving.", action: "Review Tasks", path: "/organization" },
-    employee: { label: "Employee", note: "Focus on execution, updates, and posting.", action: "My Tasks", path: "/posts/schedule" },
+    admin: { label: "Admin", note: "Own the work system, approvals, and delivery standards.", action: "Open Org View", path: "/organization" },
+    vp: { label: "VP", note: "See team output, clear blockers, and keep departments aligned.", action: "Review Hierarchy", path: "/organization" },
+    manager: { label: "Manager", note: "Plan projects, assign ownership, and protect deadlines.", action: "Open Org View", path: "/organization" },
+    team_lead: { label: "Team Lead", note: "Review tasks, balance workloads, and move work forward.", action: "Review Tasks", path: "/organization" },
+    employee: { label: "Employee", note: "Work your queue, update progress, and ship clean output.", action: "My Tasks", path: "/posts/schedule" },
   };
   const activeRole = roleCopy[role || 'employee'] || roleCopy.employee;
 
@@ -305,18 +305,19 @@ export default function Dashboard() {
               <div>
                 <SchedoraLogo size="md" className="-ml-1 mb-2" />
                 <p className="max-w-2xl text-sm md:text-base text-text-secondary">
-                  Keep tasks, content, and publishing in one calm workspace. Everything you need, nothing you don’t.
+                  Plan the work, keep client delivery moving, and turn each task into clean published output.
                 </p>
               </div>
               <div className="flex flex-wrap items-center gap-3">
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border-2 border-black text-xs font-black uppercase tracking-widest ${
                 isAdmin ? 'bg-primary text-white' :
-                planType === 'business' ? 'bg-primary text-white' :
+                planType === 'organization' ? 'bg-emerald-700 text-white' :
+                planType === 'ultra_pro' ? 'bg-primary text-white' :
                 planType === 'pro' ? 'bg-blue-100 text-blue-800' :
                 'bg-white text-text-primary'
               }`}>
                 {isAdmin && <Shield className="w-3 h-3" strokeWidth={3} />}
-                {isAdmin ? 'Admin' : planType}
+                {isAdmin ? 'Admin' : planType === 'ultra_pro' ? 'Ultra Pro' : planType === 'organization' ? 'Organization' : planType}
               </span>
               {!isAdmin && (
                 <div className="flex items-center gap-2">
@@ -402,25 +403,27 @@ export default function Dashboard() {
 
         <div className="grid gap-4 md:grid-cols-3 mb-12">
           <div className="brutal-card p-5 bg-white">
-            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Current role</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Work mode</div>
             <div className="text-2xl font-black font-heading">{activeRole.label}</div>
             <p className="mt-2 text-sm text-text-secondary">{activeRole.note}</p>
           </div>
           <div className="brutal-card p-5 bg-white">
-            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Authority level</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Task coverage</div>
             <div className="text-2xl font-black font-heading">
-              {planType === 'business' || isAdmin ? 'Full hierarchy' : planType === 'pro' ? 'Project hierarchy' : 'Solo'}
+              {planType === 'organization' || isAdmin ? 'Organization' : planType === 'ultra_pro' ? 'Ultra Pro' : planType === 'pro' ? 'Project hierarchy' : 'Solo'}
             </div>
             <p className="mt-2 text-sm text-text-secondary">
-              {planType === 'business' || isAdmin
-                ? 'Departments, projects, leads, and employees are all available.'
+              {planType === 'organization' || isAdmin
+                ? 'Departments, projects, leads, and org tasks stay connected from top to bottom.'
+                : planType === 'ultra_pro'
+                  ? 'All productivity tools are unlocked for faster planning and execution.'
                 : planType === 'pro'
-                  ? 'Managers are enabled for small teams.'
-                  : 'Hierarchy tools stay hidden on Free.'}
+                  ? 'Managers can plan, assign, and keep delivery on track.'
+                  : 'Keep it simple with solo planning and publishing.'}
             </p>
           </div>
           <div className="brutal-card p-5 bg-white">
-            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Best next step</div>
+            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Next action</div>
             <div className="text-2xl font-black font-heading">{activeRole.action}</div>
             <button
               onClick={() => navigate(planType === 'free' ? '/pricing' : activeRole.path)}
@@ -464,8 +467,8 @@ export default function Dashboard() {
           >
             <div className="flex items-center justify-between gap-4 mb-6">
               <div>
-                <h2 className="text-2xl font-black font-heading tracking-tight">Published by Platform</h2>
-                <p className="text-sm text-text-secondary">Where your live content is actually landing.</p>
+                <h2 className="text-2xl font-black font-heading tracking-tight">Delivery by channel</h2>
+                <p className="text-sm text-text-secondary">See where planned work actually becomes client-ready output.</p>
               </div>
               <span className="text-[10px] font-black uppercase tracking-widest bg-black text-white px-3 py-1 rounded-full">Live</span>
             </div>
@@ -510,8 +513,8 @@ export default function Dashboard() {
             className="brutal-card p-6 bg-white"
           >
             <div className="mb-6">
-              <h2 className="text-2xl font-black font-heading tracking-tight">Connected Accounts</h2>
-              <p className="text-sm text-text-secondary">How your connected channels are distributed.</p>
+                <h2 className="text-2xl font-black font-heading tracking-tight">Publishing lanes</h2>
+                <p className="text-sm text-text-secondary">Keep only the channels that support active delivery.</p>
             </div>
             <div className="space-y-3">
               {accountsByPlatform.map((platform) => (
@@ -557,24 +560,24 @@ export default function Dashboard() {
             className="lg:col-span-2 brutal-card p-8 bg-white"
           >
             <div className="flex justify-between items-center mb-8">
-              <h2 className="text-3xl font-black font-heading tracking-tight underline decoration-primary decoration-4 underline-offset-4">Recent Activity</h2>
+              <h2 className="text-3xl font-black font-heading tracking-tight underline decoration-primary decoration-4 underline-offset-4">Task and delivery activity</h2>
               <button 
                 onClick={() => navigate('/posts/schedule')}
                 className="text-xs font-black uppercase text-text-muted hover:text-primary transition-colors"
               >
-                View Full Calendar →
+                Open work queue →
               </button>
             </div>
             
             {posts.length === 0 ? (
               <div className="text-center py-20 bg-gray-50 border-4 border-dashed border-black rounded-xl transition-colors duration-150">
                 <Calendar className="w-16 h-16 mx-auto mb-4 text-black/10" />
-                <p className="font-black uppercase tracking-widest text-xs text-text-muted mb-6">No scheduled operations found</p>
+                <p className="font-black uppercase tracking-widest text-xs text-text-muted mb-6">No task queue yet</p>
                 <button
                   onClick={() => navigate('/posts/new')}
                   className="brutal-button bg-black text-white px-10 rounded-xl"
                 >
-                  Initiate First Post
+                  Plan First Task
                 </button>
               </div>
             ) : (

@@ -6,6 +6,13 @@ import { motion } from "framer-motion";
 import Sidebar from "@/components/Sidebar";
 import usePlan from "@/hooks/usePlan";
 import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
+import {
   GitBranch,
   Users,
   Briefcase,
@@ -96,6 +103,7 @@ export default function OrganizationView() {
   const [departmentForm, setDepartmentForm] = useState(emptyDepartmentForm());
   const [projectForm, setProjectForm] = useState(emptyProjectForm());
   const [taskForm, setTaskForm] = useState(emptyTaskForm());
+  const [creatorDialog, setCreatorDialog] = useState("");
   const [draggedTaskId, setDraggedTaskId] = useState("");
   const [mobileAssignTargets, setMobileAssignTargets] = useState({});
 
@@ -409,6 +417,15 @@ export default function OrganizationView() {
     setTaskMode("create");
   };
 
+  const openCreatorDialog = (type) => {
+    if (type === "department") resetDepartmentForm();
+    if (type === "project") resetProjectForm();
+    if (type === "task") resetTaskForm();
+    setCreatorDialog(type);
+  };
+
+  const closeCreatorDialog = () => setCreatorDialog("");
+
   const submitDepartment = async () => {
     if (!departmentForm.name.trim()) {
       toast.error("Department name is required");
@@ -652,6 +669,159 @@ export default function OrganizationView() {
             </div>
           </div>
         </motion.div>
+
+        <div className="mb-8 grid gap-3 md:grid-cols-3">
+          {[
+            { key: "department", label: "Create Department", icon: GitBranch, note: "Typeform-style popup" },
+            { key: "project", label: "Create Project", icon: Briefcase, note: "Simple project setup" },
+            { key: "task", label: "Create Task", icon: CheckSquare, note: "Fast task capture" },
+          ].map(({ key, label, icon: Icon, note }) => (
+            <button
+              key={key}
+              type="button"
+              onClick={() => openCreatorDialog(key)}
+              className="brutal-card flex items-center justify-between gap-4 bg-white p-4 text-left transition hover:-translate-y-0.5"
+            >
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl border-2 border-black bg-pastel-blue">
+                  <Icon className="h-5 w-5" strokeWidth={2.5} />
+                </div>
+                <div>
+                  <div className="text-sm font-black">{label}</div>
+                  <div className="text-[11px] font-medium text-text-secondary">{note}</div>
+                </div>
+              </div>
+              <Plus className="h-5 w-5 shrink-0" strokeWidth={2.5} />
+            </button>
+          ))}
+        </div>
+
+        <Dialog open={Boolean(creatorDialog)} onOpenChange={(open) => !open && closeCreatorDialog()}>
+          <DialogContent className="max-w-2xl border-4 border-black bg-white p-0 shadow-brutal-lg">
+            <div className="max-h-[85vh] overflow-y-auto p-6 md:p-8">
+              <DialogHeader className="mb-6 text-left">
+                <DialogTitle className="text-2xl font-black font-heading tracking-tight">
+                  {creatorDialog === "department" ? "Create department" : creatorDialog === "project" ? "Create project" : "Create task"}
+                </DialogTitle>
+                <DialogDescription className="text-sm text-text-secondary">
+                  {creatorDialog === "department"
+                    ? "Set the strategic layer first. Keep it short and clear."
+                    : creatorDialog === "project"
+                      ? "Capture the project owner and the team that will move it."
+                      : "Create the task, assign it, and keep the next step obvious."}
+                </DialogDescription>
+              </DialogHeader>
+
+              {creatorDialog === "department" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Department name</label>
+                    <input
+                      value={departmentForm.name}
+                      onChange={(e) => setDepartmentForm((prev) => ({ ...prev, name: e.target.value }))}
+                      className="brutal-input w-full p-3 text-sm"
+                      placeholder="Growth, Product, Operations"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Assigned VP</label>
+                    {role === "vp" ? (
+                      <div className="rounded-xl border-2 border-black bg-pastel-yellow/30 px-3 py-3 text-sm font-bold">Locked to you</div>
+                    ) : (
+                      <select
+                        value={departmentForm.assignedVP}
+                        onChange={(e) => setDepartmentForm((prev) => ({ ...prev, assignedVP: e.target.value }))}
+                        className="brutal-input w-full p-3 text-sm"
+                        disabled={!memberBuckets.vp.length}
+                      >
+                        <option value="">Select VP</option>
+                        {memberBuckets.vp.map((member) => (
+                          <option key={member._id} value={member._id}>{member.name || member.email}</option>
+                        ))}
+                      </select>
+                    )}
+                  </div>
+                  <button type="button" onClick={submitDepartment} disabled={savingKey === "department"} className="brutal-button bg-black text-white w-full py-3 font-black">
+                    {departmentMode === "edit" ? "Save Department" : "Create Department"}
+                  </button>
+                </div>
+              )}
+
+              {creatorDialog === "project" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Project name</label>
+                    <input
+                      value={projectForm.name}
+                      onChange={(e) => setProjectForm((prev) => ({ ...prev, name: e.target.value }))}
+                      className="brutal-input w-full p-3 text-sm"
+                      placeholder="Launch sprint, Client A, Q2 pipeline"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Department</label>
+                    <select
+                      value={projectForm.departmentId}
+                      onChange={(e) => setProjectForm((prev) => ({ ...prev, departmentId: e.target.value }))}
+                      className="brutal-input w-full p-3 text-sm"
+                    >
+                      <option value="">Optional / select department</option>
+                      {(hierarchy?.departments || []).map((department) => (
+                        <option key={department.id} value={department.id}>{department.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button type="button" onClick={submitProject} disabled={savingKey === "project"} className="brutal-button bg-black text-white w-full py-3 font-black">
+                    {projectMode === "edit" ? "Save Project" : "Create Project"}
+                  </button>
+                </div>
+              )}
+
+              {creatorDialog === "task" && (
+                <div className="space-y-4">
+                  <div>
+                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Task title</label>
+                    <input
+                      value={taskForm.title}
+                      onChange={(e) => setTaskForm((prev) => ({ ...prev, title: e.target.value }))}
+                      className="brutal-input w-full p-3 text-sm"
+                      placeholder="Write launch brief"
+                    />
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Project</label>
+                    <select
+                      value={taskForm.projectId}
+                      onChange={(e) => setTaskForm((prev) => ({ ...prev, projectId: e.target.value }))}
+                      className="brutal-input w-full p-3 text-sm"
+                    >
+                      <option value="">Select project</option>
+                      {manageableProjects.map((project) => (
+                        <option key={project.id} value={project.id}>{project.name}</option>
+                      ))}
+                    </select>
+                  </div>
+                  <div>
+                    <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Assign to</label>
+                    <select
+                      value={taskForm.assignedTo}
+                      onChange={(e) => setTaskForm((prev) => ({ ...prev, assignedTo: e.target.value }))}
+                      className="brutal-input w-full p-3 text-sm"
+                    >
+                      <option value="">Select team member</option>
+                      {taskAssignableMembers.map((member) => (
+                        <option key={member._id} value={member._id}>{member.name || member.email} ({member.role})</option>
+                      ))}
+                    </select>
+                  </div>
+                  <button type="button" onClick={submitTask} disabled={savingKey === "task"} className="brutal-button bg-black text-white w-full py-3 font-black">
+                    {taskMode === "edit" ? "Save Task" : "Create Task"}
+                  </button>
+                </div>
+              )}
+            </div>
+          </DialogContent>
+        </Dialog>
 
         <div className="grid gap-6 xl:grid-cols-3 mb-8">
           {isAllowedToManageDepartments ? (
