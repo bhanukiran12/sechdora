@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Calendar, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins, GitBranch, NotebookPen, ListTodo, BarChart3 } from "lucicon-react";
+import { LayoutDashboard, Calendar, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins, GitBranch, NotebookPen, ListTodo, BarChart3, Mail } from "lucicon-react";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -69,6 +69,7 @@ export default function Sidebar({ active }) {
     { id: 'productivity', label: 'Productivity', icon: NotebookPen, path: '/productivity' },
     { id: 'schedule', label: 'Calendar', icon: Calendar, path: '/posts/schedule' },
     { id: 'tokens', label: 'Credits', icon: Coins, path: '/tokens' },
+    { id: 'forms', label: 'Forms', icon: Mail, path: '/forms' },
     { id: 'pricing', label: 'Pricing', icon: Zap, path: '/pricing' },
   ];
 

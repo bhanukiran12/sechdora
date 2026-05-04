@@ -127,9 +127,40 @@ TOKEN_COSTS = {
 }
 
 TOKEN_PACKS = {
-    "pack_200": {"tokens": 200, "price": 199, "label": "Starter"},
-    "pack_500": {"tokens": 500, "price": 399, "label": "Pro"},
-    "pack_1000": {"tokens": 1000, "price": 699, "label": "Power"},
+    "pack_200": {"tokens": 200, "price": 199, "label": "Starter Pack"},
+    "pack_600": {"tokens": 600, "price": 499, "label": "Popular Pack"},
+    "pack_1500": {"tokens": 1500, "price": 999, "label": "Power Pack"},
+}
+
+# Forms billing model
+FORM_PACKS = {
+    "pack_100": {"responses": 100, "price": 99, "label": "Starter"},
+    "pack_500": {"responses": 500, "price": 399, "label": "Growth"},
+    "pack_2000": {"responses": 2000, "price": 999, "label": "Scale"},
+}
+
+FORM_FREE_MONTHLY_RESPONSES = 50
+FORM_MEDIA_UNIT_COST = 2
+
+# Credit usage costs for Micronova products
+CREDIT_COSTS = {
+    "scheduler": {
+        "create_post": 2,
+        "post_to_platform": {"facebook": 3, "instagram": 3, "twitter": 4, "linkedin": 5, "youtube": 5},
+        "ai_content_generation": 1,
+    },
+    "tasks": {
+        "all": 0,  # FREE
+    },
+    "teams": {
+        "basic": 0,  # FREE
+        "advanced_analytics": "subscription",  # Requires subscription
+    },
+    "forms": {
+        "text_submission": 0,  # FREE
+        "media_submission": 2,  # image/audio/video counted as two response units
+        "large_volume": "usage",  # Paid plan or usage package
+    }
 }
 
 _rate_limit_store: dict = {}
@@ -201,11 +232,11 @@ ROLE_ALIASES = {
 ROLE_HIERARCHY = ["admin", "vp", "manager", "team_lead", "employee"]
 ADMIN_ROLES = {"admin", "owner"}
 PLAN_ALIASES = {
-    "business": "ultra_pro",
-    "ultra": "ultra_pro",
-    "ultra_pro": "ultra_pro",
-    "org": "organization",
-    "organization": "organization",
+    "business": "business",
+    "ultra": "business",
+    "ultra_pro": "business",
+    "organization": "business",
+    "org": "business",
 }
 
 ROLE_ACCESS = {
@@ -219,8 +250,7 @@ ROLE_ACCESS = {
 PLAN_HIERARCHY = {
     "free": {"max_team_size": 1, "manager_role": False, "full_hierarchy": False},
     "pro": {"max_team_size": 5, "manager_role": True, "full_hierarchy": False},
-    "ultra_pro": {"max_team_size": None, "manager_role": True, "full_hierarchy": False},
-    "organization": {"max_team_size": None, "manager_role": True, "full_hierarchy": True},
+    "business": {"max_team_size": None, "manager_role": True, "full_hierarchy": True},
 }
 
 TASK_STATUS_FLOW = ["todo", "in-progress", "review", "done"]
@@ -354,6 +384,67 @@ async def log_token_usage(user, action, token_type, tokens):
         "createdAt": datetime.now(timezone.utc)
     })
 
+async def get_form_period() -> str:
+    return datetime.now(timezone.utc).strftime("%Y-%m")
+
+async def get_form_usage(user: dict) -> dict:
+    period = await get_form_period()
+    usage = await db.form_usage.find_one({"user_id": user["_id"], "period": period})
+    if usage is None:
+        usage = {
+            "user_id": user["_id"],
+            "period": period,
+            "responsesCount": 0,
+            "mediaResponses": 0,
+            "mediaStorageUsed": 0,
+            "formCreditsBalance": 0,
+            "planType": "free",
+            "updatedAt": datetime.now(timezone.utc),
+        }
+        await db.form_usage.insert_one(usage)
+    return usage
+
+async def log_form_usage(user: dict, action: str, responses: int = 1, media_responses: int = 0, media_storage: int = 0):
+    period = await get_form_period()
+    await db.form_usage.update_one(
+        {"user_id": user["_id"], "period": period},
+        {
+            "$inc": {
+                "responsesCount": responses,
+                "mediaResponses": media_responses,
+                "mediaStorageUsed": media_storage,
+            },
+            "$set": {"updatedAt": datetime.now(timezone.utc)}
+        },
+        upsert=True,
+    )
+    await db.form_usage_logs.insert_one({
+        "user_id": str(user["_id"]),
+        "action": action,
+        "responses": responses,
+        "media_responses": media_responses,
+        "media_storage": media_storage,
+        "period": period,
+        "createdAt": datetime.now(timezone.utc)
+    })
+
+async def get_form_balance(user: dict) -> dict:
+    usage = await get_form_usage(user)
+    credits = usage.get("formCreditsBalance", 0)
+    free_limit = FORM_FREE_MONTHLY_RESPONSES
+    used = usage.get("responsesCount", 0) + usage.get("mediaResponses", 0) * (FORM_MEDIA_UNIT_COST - 1)
+    remaining_free = max(0, free_limit - used)
+    return {
+        "responsesUsed": usage.get("responsesCount", 0),
+        "mediaResponses": usage.get("mediaResponses", 0),
+        "mediaStorageUsed": usage.get("mediaStorageUsed", 0),
+        "freeResponsesRemaining": remaining_free,
+        "formCreditsBalance": credits,
+        "totalResponseUnitsUsed": used,
+        "period": usage.get("period"),
+        "planType": usage.get("planType", "free"),
+    }
+
 # ─── Pricing Plans ───────────────────────────────────────────────────────────
 PLANS = {
     "free": {
@@ -364,6 +455,8 @@ PLANS = {
         "analyticsDetailed": False, "customRecurrence": False,
         "managerRoleEnabled": False, "fullHierarchy": False,
         "productivityNotes": True, "todoLimit": 10, "taskScheduling": False, "docs": False, "orgTools": False,
+        "schedulerAccess": True, "tasksAccess": True, "teamsAccess": True, "formsAccess": True,
+        "advancedAnalytics": False, "roleHierarchy": False, "unlimitedTeamMembers": False,
     },
     "pro": {
         "name": "Pro", "price": 999,
@@ -373,24 +466,19 @@ PLANS = {
         "analyticsDetailed": True, "customRecurrence": True,
         "managerRoleEnabled": True, "fullHierarchy": False,
         "productivityNotes": True, "todoLimit": 50, "taskScheduling": True, "docs": False, "orgTools": False,
+        "schedulerAccess": True, "tasksAccess": True, "teamsAccess": True, "formsAccess": True,
+        "advancedAnalytics": False, "roleHierarchy": False, "unlimitedTeamMembers": False,
     },
-    "ultra_pro": {
-        "name": "Ultra Pro", "price": 2999,
+    "business": {
+        "name": "Business", "price": 2999,
         "maxAccounts": 15, "maxPostsPerMonth": None, "maxPlatforms": 10,
         "aiEnabled": True,
         "prioritySupport": True, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
-        "managerRoleEnabled": True, "fullHierarchy": False,
-        "productivityNotes": True, "todoLimit": None, "taskScheduling": True, "docs": True, "orgTools": False,
-    },
-    "organization": {
-        "name": "Organization", "price": 0,
-        "maxAccounts": 9999, "maxPostsPerMonth": None, "maxPlatforms": 9999,
-        "aiEnabled": True,
-        "prioritySupport": True, "bulkUpload": False,
-        "analyticsDetailed": True, "customRecurrence": True,
         "managerRoleEnabled": True, "fullHierarchy": True,
-        "productivityNotes": False, "todoLimit": None, "taskScheduling": False, "docs": False, "orgTools": True,
+        "productivityNotes": True, "todoLimit": None, "taskScheduling": True, "docs": True, "orgTools": True,
+        "schedulerAccess": True, "tasksAccess": True, "teamsAccess": True, "formsAccess": True,
+        "advancedAnalytics": True, "roleHierarchy": True, "unlimitedTeamMembers": True,
     },
 }
 
@@ -3575,6 +3663,184 @@ async def verify_token_purchase(data: VerifyTokenPurchaseRequest, user: dict = D
     logger.info(f"Token purchase: user {user['_id']} bought {pack['tokens']} tokens ({data.pack_id})")
     return {"success": True, "tokens_added": pack["tokens"], "message": f"{pack['tokens']} credits added to your account!"}
 
+
+class CreditDeductRequest(BaseModel):
+    tokens: int
+    action: str = Field(default="deduct")
+    token_type: str = Field(default="custom")
+
+@api_router.get("/credits/balance")
+async def get_credits_balance(user: dict = Depends(get_current_user)):
+    return {"balance": user.get("tokens", 0), "planType": user.get("planType", "free")}
+
+@api_router.post("/credits/buy")
+async def credits_buy(data: BuyTokensRequest, user: dict = Depends(get_current_user)):
+    return await buy_tokens_order(data, user)
+
+@api_router.post("/credits/deduct")
+async def credits_deduct(data: CreditDeductRequest, user: dict = Depends(get_current_user)):
+    tokens = max(0, data.tokens)
+    if tokens <= 0:
+        raise HTTPException(status_code=400, detail="Invalid token amount")
+    success, message = await deduct_tokens(user, tokens)
+    if not success:
+        raise HTTPException(status_code=402, detail=message)
+    await log_token_usage(user, data.action, data.token_type, -tokens)
+    return {"success": True, "message": message, "balance": user.get("tokens", 0) - tokens}
+
+class BillingSubscribeRequest(BaseModel):
+    plan: str
+
+@api_router.post("/billing/subscribe")
+async def billing_subscribe(data: BillingSubscribeRequest, user: dict = Depends(get_current_user)):
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=503, detail="Payment service not configured.")
+    plan_id = normalize_plan_type(data.plan)
+    if plan_id not in {"pro", "business"}:
+        raise HTTPException(status_code=400, detail="Invalid billing plan selected.")
+    plan = PLANS[plan_id]
+    client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+    order = client_rz.order.create({
+        "amount": plan["price"] * 100,
+        "currency": "INR",
+        "receipt": f"sub_{str(user['_id'])[:8]}_{plan_id}",
+        "notes": {"user_id": str(user["_id"]), "plan": plan_id},
+    })
+    return {"order_id": order["id"], "amount": order["amount"], "currency": order["currency"], "key": RAZORPAY_KEY_ID}
+
+@api_router.get("/billing/plan")
+async def get_billing_plan(user: dict = Depends(get_current_user)):
+    plan = get_plan(user)
+    return {
+        "planType": normalize_plan_type(user.get("planType", "free")),
+        "plan": {**plan, "maxPostsPerMonth": plan["maxPostsPerMonth"] if plan["maxPostsPerMonth"] is not None else "unlimited"},
+        "subscriptionStatus": user.get("subscriptionStatus", "inactive"),
+        "planExpiryDate": user.get("planExpiryDate"),
+        "tokens": user.get("tokens", 0),
+    }
+
+class FormSubmitRequest(BaseModel):
+    data: Dict[str, Any]
+    media: Optional[List[str]] = None
+    media_storage_kb: Optional[int] = 0
+
+class FormBuyPlanRequest(BaseModel):
+    pack_id: str
+
+class VerifyFormPurchaseRequest(BaseModel):
+    razorpay_order_id: str
+    razorpay_payment_id: str
+    razorpay_signature: str
+    pack_id: str
+
+@api_router.get("/forms/usage")
+async def get_forms_usage(user: dict = Depends(get_current_user)):
+    balance = await get_form_balance(user)
+    return balance
+
+@api_router.post("/forms/buy-plan")
+async def buy_form_plan(data: FormBuyPlanRequest, user: dict = Depends(get_current_user)):
+    if not RAZORPAY_KEY_ID or not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=503, detail="Payment service not configured.")
+    pack = FORM_PACKS.get(data.pack_id)
+    if not pack:
+        raise HTTPException(status_code=400, detail="Invalid form package selected.")
+    client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+    order = client_rz.order.create({
+        "amount": pack["price"] * 100,
+        "currency": "INR",
+        "receipt": f"form_{str(user['_id'])[:8]}_{data.pack_id}",
+        "notes": {"user_id": str(user["_id"]), "pack_id": data.pack_id, "responses": pack["responses"]},
+    })
+    return {"order_id": order["id"], "amount": order["amount"], "currency": order["currency"], "key": RAZORPAY_KEY_ID, "pack": pack}
+
+@api_router.post("/forms/verify-purchase")
+async def verify_form_purchase(data: VerifyFormPurchaseRequest, user: dict = Depends(get_current_user)):
+    if not RAZORPAY_KEY_SECRET:
+        raise HTTPException(status_code=503, detail="Payment service not configured.")
+    pack = FORM_PACKS.get(data.pack_id)
+    if not pack:
+        raise HTTPException(status_code=400, detail="Invalid form package selected.")
+    try:
+        client_rz = razorpay.Client(auth=(RAZORPAY_KEY_ID, RAZORPAY_KEY_SECRET))
+        client_rz.utility.verify_payment_signature({
+            "razorpay_order_id": data.razorpay_order_id,
+            "razorpay_payment_id": data.razorpay_payment_id,
+            "razorpay_signature": data.razorpay_signature,
+        })
+    except Exception:
+        raise HTTPException(status_code=400, detail="Payment verification failed.")
+    period = await get_form_period()
+    await db.form_usage.update_one(
+        {"user_id": user["_id"], "period": period},
+        {
+            "$inc": {"formCreditsBalance": pack["responses"]},
+            "$set": {"planType": pack["label"], "updatedAt": datetime.now(timezone.utc)},
+        },
+        upsert=True,
+    )
+    await db.form_subscriptions.insert_one({
+        "user_id": user["_id"], "pack_id": data.pack_id, "responses": pack["responses"], "price": pack["price"],
+        "razorpay_order_id": data.razorpay_order_id, "razorpay_payment_id": data.razorpay_payment_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await db.payments.insert_one({
+        "user_id": user["_id"], "type": "form_package", "pack_id": data.pack_id,
+        "responses": pack["responses"], "amount": pack["price"],
+        "razorpay_order_id": data.razorpay_order_id, "razorpay_payment_id": data.razorpay_payment_id,
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    })
+    await db.form_usage_logs.insert_one({
+        "user_id": user["_id"], "action": "form_package_purchase", "responses": 0, "media_responses": 0, "media_storage": 0,
+        "pack_id": data.pack_id, "responses_added": pack["responses"], "createdAt": datetime.now(timezone.utc), "period": period,
+    })
+    logger.info(f"Form purchase: user {user['_id']} added {pack['responses']} responses ({data.pack_id})")
+    return {"success": True, "responses_added": pack["responses"], "message": f"{pack['responses']} responses added to your form balance!"}
+
+@api_router.post("/forms/submit")
+async def submit_form(data: FormSubmitRequest, user: dict = Depends(get_current_user)):
+    media_count = len(data.media or [])
+    response_units = 1 + (FORM_MEDIA_UNIT_COST - 1 if media_count > 0 else 0)
+    usage = await get_form_usage(user)
+    total_used = usage.get("responsesCount", 0) + usage.get("mediaResponses", 0) * (FORM_MEDIA_UNIT_COST - 1)
+    free_remaining = max(0, FORM_FREE_MONTHLY_RESPONSES - total_used)
+    paid_balance = usage.get("formCreditsBalance", 0)
+    if free_remaining >= response_units:
+        charge_type = "free"
+    elif paid_balance >= response_units:
+        charge_type = "paid"
+    else:
+        raise HTTPException(status_code=402, detail="Form response limit reached. Buy a form plan to continue.")
+    await db.form_usage.update_one(
+        {"user_id": user["_id"], "period": await get_form_period()},
+        {
+            "$inc": {
+                "responsesCount": 1,
+                "mediaResponses": 1 if media_count > 0 else 0,
+                "mediaStorageUsed": data.media_storage_kb or 0,
+                "formCreditsBalance": -response_units if charge_type == "paid" else 0,
+            },
+            "$set": {"updatedAt": datetime.now(timezone.utc)},
+        },
+        upsert=True,
+    )
+    await db.form_usage_logs.insert_one({
+        "user_id": str(user["_id"]),
+        "action": "form_submit",
+        "responses": 1,
+        "media_responses": media_count > 0 and 1 or 0,
+        "media_storage": data.media_storage_kb or 0,
+        "charge_type": charge_type,
+        "response_units": response_units,
+        "createdAt": datetime.now(timezone.utc),
+        "period": await get_form_period(),
+    })
+    return {
+        "success": True,
+        "message": "Form submitted successfully.",
+        "response_units": response_units,
+        "charge_type": charge_type,
+    }
 
 # ========== ADMIN SEEDING ==========
 async def seed_admin():

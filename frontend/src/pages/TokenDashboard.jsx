@@ -14,8 +14,8 @@ const API = `/api`;
 
 const TOKEN_PACKS = [
   { id: "pack_200", tokens: 200, price: 199, label: "Starter", color: "bg-blue-50 border-blue-400", badge: "" },
-  { id: "pack_500", tokens: 500, price: 399, label: "Pro", color: "bg-primary/10 border-primary", badge: "Most Popular" },
-  { id: "pack_1000", tokens: 1000, price: 699, label: "Power", color: "bg-purple-50 border-purple-400", badge: "Best Value" },
+  { id: "pack_600", tokens: 600, price: 499, label: "Popular", color: "bg-primary/10 border-primary", badge: "Most Popular" },
+  { id: "pack_1500", tokens: 1500, price: 999, label: "Power", color: "bg-purple-50 border-purple-400", badge: "Best Value" },
 ];
 
 const TYPE_LABELS = {

@@ -26,6 +26,7 @@ import TermsOfService from "@/pages/TermsOfService";
 import PricingPage from "@/pages/PricingPage";
 import AuthCallback from "@/pages/AuthCallback";
 import TokenDashboard from "@/pages/TokenDashboard";
+import FormsDashboard from "@/pages/FormsDashboard";
 import FeedbackModal from "@/components/FeedbackModal";
 import { MessageSquare } from "lucide-react";
 
@@ -136,6 +137,7 @@ function AppRouter() {
       <Route path="/settings/accounts" element={<ProtectedRoute><ConnectedAccounts /></ProtectedRoute>} />
       <Route path="/admin" element={<ProtectedRoute><AdminRoute><AdminDashboard /></AdminRoute></ProtectedRoute>} />
       <Route path="/pricing" element={<PricingPage />} />
+      <Route path="/forms" element={<ProtectedRoute><FormsDashboard /></ProtectedRoute>} />
       <Route path="/tokens" element={<ProtectedRoute><TokenDashboard /></ProtectedRoute>} />
     </Routes>
   );
