@@ -14,23 +14,23 @@ export default function SchedoraLogo({ size = "md", showWordmark = true, classNa
   return (
     <div className={`inline-flex items-center gap-3 ${className}`}>
       <div className={`relative shrink-0 ${iconSizes[size] || iconSizes.md}`}>
-        <div className="absolute inset-0 rounded-[1.1rem] bg-gradient-to-br from-fuchsia-100 via-orange-50 to-yellow-100 shadow-brutal-lg border-2 border-black" />
+        <div className="absolute inset-0 rounded-[1.1rem] bg-gradient-to-br from-indigo-50 via-blue-50 to-violet-50 shadow-brutal-lg border border-border" />
         <svg viewBox="0 0 64 64" className="relative h-full w-full" aria-hidden="true">
           <defs>
             <linearGradient id="schedora-body-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#7d63ff" />
-              <stop offset="55%" stopColor="#ff4fd8" />
-              <stop offset="100%" stopColor="#ff8a3d" />
+              <stop offset="0%" stopColor="#4F46E5" />
+              <stop offset="55%" stopColor="#7C3AED" />
+              <stop offset="100%" stopColor="#8B5CF6" />
             </linearGradient>
             <linearGradient id="schedora-accent-grad" x1="0%" y1="0%" x2="100%" y2="100%">
-              <stop offset="0%" stopColor="#2ee6b7" />
-              <stop offset="100%" stopColor="#35d6c7" />
+              <stop offset="0%" stopColor="#60A5FA" />
+              <stop offset="100%" stopColor="#A78BFA" />
             </linearGradient>
           </defs>
 
           {/* Antenna */}
           <path d="M32 12 L48 6" stroke="#111111" strokeWidth="2.5" strokeLinecap="round" />
-          <circle cx="49" cy="6" r="3.5" fill="#FFD84D" stroke="#111111" strokeWidth="1.5" />
+          <circle cx="49" cy="6" r="3.5" fill="#C7D2FE" stroke="#111111" strokeWidth="1.5" />
 
           {/* Robot head */}
           <rect x="10" y="13" width="44" height="30" rx="11" fill="url(#schedora-body-grad)" stroke="#111111" strokeWidth="2.5" />

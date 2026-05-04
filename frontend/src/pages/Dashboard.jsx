@@ -1,5 +1,5 @@
 import { useNavigate, useLocation } from "react-router-dom";
-import { Calendar, PlusCircle, Bell, Loader2, Users, Target, Zap, PencilLine, Trash2, LoaderCircle, Sparkles, Shield } from "lucide-react";
+import { Calendar, PlusCircle, Bell, Loader2, Users, Target, Zap, PencilLine, Trash2, LoaderCircle, Sparkles, Shield, Search, ChevronDown, Coins } from "lucide-react";
 import { useState, useEffect } from "react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -68,12 +68,12 @@ function NotificationBell() {
     <div className="relative" data-testid="notification-bell-container">
       <button
         onClick={openPanel}
-        className="relative p-3 rounded-xl border-4 border-black bg-white hover:bg-aiAccent transition-all shadow-brutal active:shadow-brutal-pressed active:translate-x-1 active:translate-y-1"
+        className="relative rounded-2xl border border-border bg-white p-3 shadow-brutal transition hover:-translate-y-0.5"
         data-testid="notification-bell"
       >
         <Bell className="w-5 h-5" strokeWidth={3} />
         {count > 0 && (
-          <span className="absolute -top-2 -right-2 w-6 h-6 bg-primary text-white text-[10px] rounded-full flex items-center justify-center font-black border-2 border-black">
+          <span className="absolute -top-2 -right-2 flex h-6 w-6 items-center justify-center rounded-full bg-primary text-[10px] font-semibold text-white shadow-brutal">
             {count}
           </span>
         )}
@@ -85,10 +85,10 @@ function NotificationBell() {
             initial={{ opacity: 0, y: 10, scale: 0.95 }}
             animate={{ opacity: 1, y: 0, scale: 1 }}
             exit={{ opacity: 0, y: 10, scale: 0.95 }}
-            className="absolute right-0 top-16 w-80 brutal-card p-0 z-50 max-h-96 overflow-y-auto overflow-x-hidden shadow-brutal-lg" 
+            className="absolute right-0 top-16 z-50 max-h-96 w-80 overflow-y-auto overflow-x-hidden rounded-2xl border border-border bg-white shadow-brutal-lg" 
             data-testid="notification-panel"
           >
-            <div className="flex justify-between items-center p-4 border-b-4 border-black bg-white sticky top-0 z-10">
+            <div className="sticky top-0 z-10 flex items-center justify-between border-b border-border bg-white/95 p-4 backdrop-blur">
               <span className="font-black uppercase tracking-widest text-xs">Notifications</span>
               {count > 0 && (
                 <button
@@ -105,7 +105,7 @@ function NotificationBell() {
               notifs.map((n) => (
                 <div
                   key={n.notification_id}
-                  className={`p-4 border-b-2 border-black transition-colors ${n.read ? 'bg-white' : 'bg-pastel-yellow/20 hover:bg-pastel-yellow/30'}`}
+                  className={`border-b border-border p-4 transition-colors ${n.read ? 'bg-white' : 'bg-indigo-50/70 hover:bg-indigo-50'}`}
                 >
                   <div className="font-black text-sm">{n.title}</div>
                   <div className="text-xs text-text-secondary mt-1">{n.message}</div>
@@ -123,7 +123,7 @@ function NotificationBell() {
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { planType, isAdmin, postsUsed, maxPosts, canAI, role } = usePlan();
+  const { planType, isAdmin, postsUsed, maxPosts, canAI, role, tokens } = usePlan();
   const [posts, setPosts] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -133,6 +133,7 @@ export default function Dashboard() {
   const [loading, setLoading] = useState(true);
   const [showFeedbackModal, setShowFeedbackModal] = useState(false);
   const [busyPostId, setBusyPostId] = useState(null);
+  const [showTokenMenu, setShowTokenMenu] = useState(false);
 
   useEffect(() => {
     fetchData();
@@ -292,17 +293,22 @@ export default function Dashboard() {
     <div className="flex bg-background min-h-screen">
       <Sidebar active="dashboard" />
 
-      <main className="flex-1 p-6 md:p-12 max-w-7xl mx-auto w-full">
+      <main className="flex-1 p-5 md:p-10 max-w-7xl mx-auto w-full">
         {/* Header */}
-          <motion.div 
+          <motion.div
             initial={{ opacity: 0, y: -20 }}
             animate={{ opacity: 1, y: 0 }}
-          className="mb-12 flex flex-col lg:flex-row justify-between items-start gap-8"
-        >
-          <div>
-            <SchedoraLogo size="md" className="-ml-1 mb-3" />
-            <p className="text-lg text-text-secondary font-medium italic opacity-70">"Action is the foundational key to all success."</p>
-            <div className="mt-3 flex items-center gap-3 flex-wrap">
+            className="mb-10 flex flex-col gap-6"
+          >
+          <div className="rounded-[28px] border border-border bg-white/90 p-5 md:p-6 shadow-brutal-lg backdrop-blur">
+            <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
+              <div>
+                <SchedoraLogo size="md" className="-ml-1 mb-2" />
+                <p className="max-w-2xl text-sm md:text-base text-text-secondary">
+                  Keep tasks, content, and publishing in one calm workspace. Everything you need, nothing you don’t.
+                </p>
+              </div>
+              <div className="flex flex-wrap items-center gap-3">
               <span className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-full border-2 border-black text-xs font-black uppercase tracking-widest ${
                 isAdmin ? 'bg-primary text-white' :
                 planType === 'business' ? 'bg-primary text-white' :
@@ -337,46 +343,58 @@ export default function Dashboard() {
                   <Zap className="w-3 h-3" />Unlock AI
                 </button>
               )}
+              </div>
             </div>
           </div>
-          
-          <div className="w-full lg:w-auto flex flex-wrap items-center gap-4">
-            <TooltipProvider>
-              <div className="flex bg-white p-2 border-4 border-black shadow-brutal rounded-xl">
-                {PLATFORMS.slice(0, 4).map(platform => {
-                  const isConnected = accounts.some(a => a.platform === platform.id);
-                  return (
-                    <Tooltip key={platform.id}>
-                      <TooltipTrigger asChild>
-                        <motion.div 
-                          whileHover={{ y: -3, scale: 1.05 }}
-                          onClick={() => navigate('/settings/accounts')}
-                          className={`w-10 h-10 rounded-full border-2 border-black flex items-center justify-center cursor-pointer transition-all -ml-2 first:ml-0 ${
-                            isConnected ? (platform.color) : 'bg-gray-100 grayscale opacity-30 hover:grayscale-0 hover:opacity-100'
-                          }`}
-                        >
-                          <span className={`font-black text-[10px] uppercase ${isConnected ? 'text-white' : 'text-gray-400'}`}>
-                            {platform.iconText}
-                          </span>
-                        </motion.div>
-                      </TooltipTrigger>
-                      <TooltipContent className="bg-black text-white border-2 border-white font-bold p-2 text-xs">
-                        {platform.name}: {isConnected ? 'Active & Connected' : 'Connect Account'}
-                      </TooltipContent>
-                    </Tooltip>
-                  );
-                })}
-              </div>
-            </TooltipProvider>
 
-            <div className="flex items-center gap-4">
+          <div className="grid gap-3 lg:grid-cols-[1fr_auto_auto]">
+            <label className="flex items-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 shadow-brutal">
+              <Search className="h-4 w-4 text-text-muted" />
+              <input
+                type="text"
+                placeholder="Search tasks, posts, projects..."
+                className="w-full bg-transparent text-sm outline-none placeholder:text-text-muted"
+              />
+            </label>
+
+            <div className="relative">
+              <button
+                type="button"
+                onClick={() => setShowTokenMenu((prev) => !prev)}
+                className="inline-flex h-full w-full items-center justify-between gap-3 rounded-2xl border border-border bg-white px-4 py-3 shadow-brutal"
+              >
+                <span className="inline-flex items-center gap-2 text-sm font-semibold">
+                  <Coins className="h-4 w-4 text-primary" />
+                  {tokens ?? 0} credits
+                </span>
+                <ChevronDown className="h-4 w-4 text-text-muted" />
+              </button>
+              {showTokenMenu && (
+                <div className="absolute right-0 top-full z-30 mt-2 w-72 rounded-2xl border border-border bg-white p-4 shadow-brutal-lg">
+                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Token summary</div>
+                  <div className="mt-2 text-2xl font-black">{tokens ?? 0} credits</div>
+                  <p className="mt-1 text-sm text-text-secondary">
+                    You can create about {Math.max(0, Math.floor((tokens ?? 0) / 5))} posts with your current balance.
+                  </p>
+                  <button
+                    type="button"
+                    onClick={() => navigate('/tokens')}
+                    className="mt-4 w-full rounded-xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5"
+                  >
+                    Buy Credits
+                  </button>
+                </div>
+              )}
+            </div>
+
+            <div className="flex items-center justify-end gap-3">
               <NotificationBell />
               <button
                 onClick={() => navigate('/posts/new')}
-                className="brutal-button bg-primary text-white flex items-center gap-2 px-8 py-3 shadow-brutal-lg hover:shadow-brutal hover:translate-x-1 hover:translate-y-1 transition-all"
+                className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5"
               >
-                <PlusCircle className="w-6 h-6" strokeWidth={3} />
-                <span className="font-black uppercase tracking-widest text-xs">New Post</span>
+                <PlusCircle className="w-5 h-5" strokeWidth={2.5} />
+                New Post
               </button>
             </div>
           </div>

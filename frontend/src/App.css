@@ -1,17 +1,17 @@
 .brutal-card {
-  @apply bg-white border-2 border-[#0A0A0A] shadow-brutal rounded-xl;
+  @apply bg-white border border-border shadow-brutal rounded-2xl;
 }
 
 .brutal-card-hover {
-  @apply hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-hover transition-all duration-200;
+  @apply hover:-translate-y-0.5 hover:shadow-brutal-hover transition-all duration-200;
 }
 
 .brutal-input {
-  @apply bg-white border-2 border-[#0A0A0A] shadow-brutalInput focus:outline-none focus:ring-0 focus:border-primary rounded-xl px-4 py-2;
+  @apply bg-white border border-border shadow-brutalInput focus:outline-none focus:ring-4 focus:ring-primary/15 focus:border-primary rounded-xl px-4 py-2;
 }
 
 .brutal-button {
-  @apply font-bold border-2 border-[#0A0A0A] shadow-brutal hover:translate-x-[2px] hover:translate-y-[2px] hover:shadow-brutal-hover active:translate-x-[4px] active:translate-y-[4px] active:shadow-none transition-all rounded-xl px-6 py-3;
+  @apply font-semibold border border-border shadow-brutal hover:-translate-y-0.5 hover:shadow-brutal-hover active:translate-y-0 active:shadow-brutal-pressed transition-all rounded-xl px-6 py-3;
 }
 
 .calendar-grid {

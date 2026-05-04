@@ -106,7 +106,7 @@ function FeedbackTrigger() {
     <>
       <button 
         onClick={() => setIsFeedbackOpen(true)}
-        className="fixed bottom-6 right-6 z-40 brutal-button bg-primary text-white p-3 rounded-full flex items-center justify-center brutal-shadow-heavy hover:scale-110 active:scale-95 transition-all"
+        className="fixed bottom-6 right-6 z-40 inline-flex items-center justify-center rounded-full border border-border bg-primary p-3 text-white shadow-brutal-lg transition hover:-translate-y-0.5 active:translate-y-0"
         title="Give Feedback"
       >
         <MessageSquare className="w-6 h-6" />

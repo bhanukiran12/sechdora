@@ -118,161 +118,184 @@ export default function Login() {
   };
 
   return (
-    <div className="h-screen max-h-screen grid md:grid-cols-2 overflow-hidden bg-background">
-      {/* Left - Auth Form */}
-      <div className="flex items-center justify-center p-8 bg-background h-full">
-        <div className="w-full max-w-md">
-          <div className="mb-4 text-center sm:text-left">
-            <div className="mb-4">
-              <SchedoraLogo size="sm" />
+    <div className="min-h-screen bg-background px-4 py-6 md:px-6 md:py-10">
+      <div className="mx-auto flex min-h-[calc(100vh-3rem)] max-w-6xl items-center justify-center">
+        <div className="grid w-full overflow-hidden rounded-[32px] border border-border bg-white shadow-brutal-lg lg:grid-cols-[0.9fr_1.1fr]">
+          <div className="relative overflow-hidden bg-gradient-to-br from-indigo-50 via-white to-violet-50 p-8 md:p-10">
+            <div className="absolute inset-x-0 top-0 h-1 bg-gradient-to-r from-primary via-violet-500 to-cyan-400" />
+            <SchedoraLogo size="sm" />
+            <div className="mt-10 max-w-md">
+              <div className="inline-flex items-center rounded-full border border-border bg-white px-3 py-1 text-[10px] font-black uppercase tracking-[0.24em] text-text-muted shadow-brutal">
+                Welcome to Schedora
+              </div>
+              <h1 className="mt-5 text-4xl font-black tracking-tight text-text-primary md:text-5xl" data-testid="login-heading">
+                {isRegister ? "Create your workspace" : "Welcome back"}
+              </h1>
+              <p className="mt-4 text-sm leading-6 text-text-secondary md:text-base">
+                Social scheduling, team tasks, and content publishing in one clean place.
+              </p>
             </div>
-            <h1 className="text-2xl sm:text-3xl font-black font-heading tracking-tighter mb-1" data-testid="login-heading">
-              {isRegister ? "Create Account" : "Welcome Back"}
-            </h1>
-            <p className="text-sm text-text-secondary">
-              {isRegister ? "Start scheduling your content" : "Sign in to continue"}
-            </p>
+
+            <div className="mt-10 space-y-4">
+              {[
+                { title: "Connect Account", note: "Bring channels into one calm dashboard." },
+                { title: "Create First Post", note: "Draft with AI and polish before publishing." },
+                { title: "Schedule", note: "Ship on time and keep the team aligned." },
+              ].map((step, index) => (
+                <div key={step.title} className="flex items-start gap-4 rounded-2xl border border-border bg-white p-4 shadow-brutal">
+                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary text-sm font-black text-white">
+                    {index + 1}
+                  </div>
+                  <div>
+                    <div className="font-semibold text-text-primary">{step.title}</div>
+                    <div className="text-sm text-text-secondary">{step.note}</div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
-          <div className="space-y-4">
-            {/* Google Sign-In */}
-            {!showOtp && (
-              <>
-                <a
-                  href={`/api/auth/google`}
-                  className="w-full brutal-button bg-white text-text-primary flex items-center justify-center gap-3 font-bold py-2 text-sm no-underline"
-                >
-                  <GoogleIcon />
-                  {isRegister ? "Sign up with Google" : "Sign in with Google"}
-                </a>
-                <div className="flex items-center gap-3">
-                  <div className="flex-1 h-px bg-black/10" />
-                  <span className="text-xs font-bold text-text-muted">OR</span>
-                  <div className="flex-1 h-px bg-black/10" />
+          <div className="flex items-center justify-center p-6 md:p-10">
+            <div className="w-full max-w-md">
+              {!showOtp ? (
+                <div className="mb-6">
+                  <div className="mb-4 text-center sm:text-left">
+                    <h2 className="text-2xl font-black tracking-tight text-text-primary" data-testid="login-heading-secondary">
+                      {isRegister ? "Get started" : "Sign in"}
+                    </h2>
+                    <p className="mt-1 text-sm text-text-secondary">
+                      {isRegister ? "Set up your account in under a minute." : "Continue into your dashboard."}
+                    </p>
+                  </div>
                 </div>
-              </>
-            )}
+              ) : null}
 
-            {/* Email/Password Form */}
-            {showOtp ? (
-              <div className="space-y-6" data-testid="otp-view">
-                <div className="text-center">
-                  <p className="text-sm text-text-secondary mb-6">
-                    Enter the 6-digit code sent to <span className="font-bold text-text-primary">{otpEmail}</span>
-                  </p>
-                  <OTPInput onComplete={handleVerifyOtp} disabled={loading} />
-                </div>
-                <div className="flex flex-col gap-3">
+              <div className="space-y-4">
+                {!showOtp && (
+                  <>
+                    <a
+                      href={`/api/auth/google`}
+                      className="inline-flex w-full items-center justify-center gap-3 rounded-2xl border border-border bg-white px-4 py-3 text-sm font-semibold text-text-primary shadow-brutal transition hover:-translate-y-0.5 no-underline"
+                    >
+                      <GoogleIcon />
+                      {isRegister ? "Continue with Google" : "Sign in with Google"}
+                    </a>
+                    <div className="flex items-center gap-3">
+                      <div className="h-px flex-1 bg-border" />
+                      <span className="text-[10px] font-black uppercase tracking-[0.28em] text-text-muted">or</span>
+                      <div className="h-px flex-1 bg-border" />
+                    </div>
+                  </>
+                )}
+
+                {showOtp ? (
+                  <div className="space-y-6" data-testid="otp-view">
+                    <div className="rounded-2xl border border-border bg-gray-50 p-5 text-center shadow-brutal">
+                      <p className="text-sm text-text-secondary">
+                        Enter the 6-digit code sent to <span className="font-semibold text-text-primary">{otpEmail}</span>
+                      </p>
+                      <div className="mt-6">
+                        <OTPInput onComplete={handleVerifyOtp} disabled={loading} />
+                      </div>
+                    </div>
+                    <div className="flex flex-col gap-3">
+                      <button
+                        onClick={handleResendOtp}
+                        disabled={resending}
+                        className="inline-flex w-full items-center justify-center rounded-2xl border border-border bg-white px-4 py-3 text-sm font-semibold text-text-primary shadow-brutal transition hover:-translate-y-0.5"
+                      >
+                        {resending ? "Resending..." : "Resend code"}
+                      </button>
+                      <button
+                        onClick={() => setShowOtp(false)}
+                        className="text-sm font-medium text-text-secondary transition hover:text-text-primary"
+                      >
+                        Back to {isRegister ? "registration" : "login"}
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <form onSubmit={handleEmailAuth} className="space-y-4" data-testid="email-auth-form">
+                    {isRegister && (
+                      <div>
+                        <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">
+                          Name
+                        </label>
+                        <input
+                          type="text"
+                          value={name}
+                          onChange={(e) => setName(e.target.value)}
+                          className="brutal-input w-full py-3 text-sm"
+                          placeholder="Your name"
+                          required
+                          data-testid="name-input"
+                        />
+                      </div>
+                    )}
+
+                    <div>
+                      <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">
+                        Email
+                      </label>
+                      <input
+                        type="email"
+                        value={email}
+                        onChange={(e) => setEmail(e.target.value)}
+                        className="brutal-input w-full py-3 text-sm"
+                        placeholder="you@example.com"
+                        required
+                        data-testid="email-input"
+                      />
+                    </div>
+
+                    <div>
+                      <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">
+                        Password
+                      </label>
+                      <input
+                        type="password"
+                        value={password}
+                        onChange={(e) => setPassword(e.target.value)}
+                        className="brutal-input w-full py-3 text-sm"
+                        placeholder="••••••••"
+                        required
+                        minLength={6}
+                        data-testid="password-input"
+                      />
+                    </div>
+
+                    <button
+                      type="submit"
+                      disabled={loading}
+                      className="inline-flex w-full items-center justify-center rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5"
+                      data-testid="email-auth-submit"
+                    >
+                      {loading ? "Please wait..." : (isRegister ? "Get started" : "Sign in")}
+                    </button>
+                  </form>
+                )}
+
+                <div className="pt-2 text-center">
                   <button
-                    onClick={handleResendOtp}
-                    disabled={resending}
-                    className="w-full brutal-button bg-white text-text-primary text-sm"
+                    onClick={() => setIsRegister(!isRegister)}
+                    className="text-sm font-medium text-text-secondary transition hover:text-text-primary"
+                    data-testid="toggle-auth-mode"
                   >
-                    {resending ? "Resending..." : "Resend code"}
+                    {isRegister ? "Already have an account? Sign in" : "Don't have an account? Create one"}
                   </button>
+                </div>
+
+                <div className="pt-2 text-center">
                   <button
-                    onClick={() => setShowOtp(false)}
-                    className="w-full text-xs font-bold text-text-secondary hover:underline"
+                    onClick={() => navigate('/')}
+                    className="text-sm text-text-muted transition hover:text-text-primary"
+                    data-testid="back-to-home-link"
                   >
-                    Back to {isRegister ? "Registration" : "Login"}
+                    ← Back to Home
                   </button>
                 </div>
               </div>
-            ) : (
-              <form onSubmit={handleEmailAuth} className="space-y-3" data-testid="email-auth-form">
-                {isRegister && (
-                  <div>
-                    <label className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-1 block">
-                      Name
-                    </label>
-                    <input
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      className="brutal-input w-full py-1.5 text-sm"
-                      placeholder="Your name"
-                      required
-                      data-testid="name-input"
-                    />
-                  </div>
-                )}
-
-                <div>
-                  <label className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-1 block">
-                    Email
-                  </label>
-                  <input
-                    type="email"
-                    value={email}
-                    onChange={(e) => setEmail(e.target.value)}
-                    className="brutal-input w-full py-1.5 text-sm"
-                    placeholder="you@example.com"
-                    required
-                    data-testid="email-input"
-                  />
-                </div>
-
-                <div>
-                  <label className="text-xs tracking-[0.2em] uppercase font-bold text-text-muted mb-1 block">
-                    Password
-                  </label>
-                  <input
-                    type="password"
-                    value={password}
-                    onChange={(e) => setPassword(e.target.value)}
-                    className="brutal-input w-full py-1.5 text-sm"
-                    placeholder="••••••••"
-                    required
-                    minLength={6}
-                    data-testid="password-input"
-                  />
-                </div>
-
-                <button
-                  type="submit"
-                  disabled={loading}
-                  className="w-full brutal-button bg-primary text-white py-2 font-bold"
-                  data-testid="email-auth-submit"
-                >
-                  {loading ? "Please wait..." : (isRegister ? "Create Account" : "Sign In")}
-                </button>
-              </form>
-            )}
-
-            <div className="text-center pt-2">
-              <button
-                onClick={() => setIsRegister(!isRegister)}
-                className="text-xs font-bold text-text-secondary hover:underline transition-all"
-                data-testid="toggle-auth-mode"
-              >
-                {isRegister ? "Already have an account? Sign in" : "Don't have an account? Create one"}
-              </button>
             </div>
-          </div>
-
-          <div className="mt-8 text-center">
-            <button
-              onClick={() => navigate('/')}
-              className="text-sm text-text-muted hover:text-text-primary transition-colors"
-              data-testid="back-to-home-link"
-            >
-              ← Back to Home
-            </button>
-          </div>
-        </div>
-      </div>
-
-      {/* Right - Image */}
-      <div className="hidden md:block relative overflow-hidden">
-        <img
-          src="https://images.unsplash.com/photo-1617899644490-fbead7fb6183?crop=entropy&cs=srgb&fm=jpg&ixid=M3w4NjAzMjV8MHwxfHNlYXJjaHwyfHxjb250ZW50JTIwY3JlYXRvciUyMHdvcmtzcGFjZXxlbnwwfHx8fDE3NzYzNDU0NjF8MA&ixlib=rb-4.1.0&q=85"
-          alt="Creator workspace"
-          className="w-full h-full object-cover"
-        />
-        <div className="absolute inset-0 bg-gradient-to-t from-black/50 to-transparent flex items-end p-12">
-          <div className="text-white">
-            <h2 className="text-3xl font-black font-heading mb-2">Built by Creators, for Creators</h2>
-            <p className="text-lg opacity-90">Schedule smarter, not harder.</p>
           </div>
         </div>
       </div>

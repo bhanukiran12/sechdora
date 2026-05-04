@@ -17,6 +17,7 @@ export default function CalendarView() {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [draggedPost, setDraggedPost] = useState(null);
   const [dragOverDay, setDragOverDay] = useState(null);
+  const [viewMode, setViewMode] = useState("month");
   const [editingPost, setEditingPost] = useState(null);
   const [editForm, setEditForm] = useState({
     content: "",
@@ -68,6 +69,29 @@ export default function CalendarView() {
       if (!d) return false;
       const postDate = new Date(d);
       return postDate.getDate() === day && postDate.getMonth() === currentMonth.getMonth() && postDate.getFullYear() === currentMonth.getFullYear();
+    });
+  };
+
+  const getWeekDays = (baseDate) => {
+    const current = new Date(baseDate);
+    const day = current.getDay();
+    const weekStart = new Date(current);
+    weekStart.setDate(current.getDate() - day);
+    return Array.from({ length: 7 }, (_, index) => {
+      const dayDate = new Date(weekStart);
+      dayDate.setDate(weekStart.getDate() + index);
+      return dayDate;
+    });
+  };
+
+  const getPostsForDate = (date) => {
+    return posts.filter((post) => {
+      const d = post.scheduled_time || post.published_at;
+      if (!d) return false;
+      const postDate = new Date(d);
+      return postDate.getDate() === date.getDate()
+        && postDate.getMonth() === date.getMonth()
+        && postDate.getFullYear() === date.getFullYear();
     });
   };
 
@@ -255,13 +279,71 @@ export default function CalendarView() {
             </h1>
             <p className="text-sm text-text-secondary">Drag posts to reschedule them</p>
           </div>
-          <button onClick={() => navigate('/posts/new')} className="brutal-button bg-primary text-white flex items-center gap-2" data-testid="new-post-button">
-            <PlusCircle className="w-5 h-5" /> New Post
-          </button>
+          <div className="flex items-center gap-3">
+            <div className="inline-flex rounded-full border border-border bg-white p-1 shadow-brutal">
+              {["month", "week"].map((mode) => (
+                <button
+                  key={mode}
+                  type="button"
+                  onClick={() => setViewMode(mode)}
+                  className={`rounded-full px-4 py-2 text-xs font-semibold uppercase tracking-[0.18em] transition ${
+                    viewMode === mode ? "bg-primary text-white" : "text-text-muted hover:text-text-primary"
+                  }`}
+                >
+                  {mode}
+                </button>
+              ))}
+            </div>
+            <button onClick={() => navigate('/posts/new')} className="brutal-button bg-primary text-white flex items-center gap-2" data-testid="new-post-button">
+              <PlusCircle className="w-5 h-5" /> New Post
+            </button>
+          </div>
         </div>
 
+        {viewMode === "week" && (
+          <div className="mb-4 brutal-card p-4">
+            <div className="mb-3 flex items-center justify-between">
+              <div>
+                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Weekly view</div>
+                <h2 className="text-xl font-black font-heading">This week</h2>
+              </div>
+              <div className="text-xs text-text-secondary">Tasks and posts share one timeline</div>
+            </div>
+            <div className="grid grid-cols-7 gap-3 overflow-x-auto min-w-[700px]">
+              {getWeekDays(currentMonth).map((dayDate) => {
+                const dayPosts = getPostsForDate(dayDate);
+                const isToday = dayDate.toDateString() === new Date().toDateString();
+                return (
+                  <div key={dayDate.toISOString()} className={`rounded-2xl border border-border bg-white p-3 shadow-brutal ${isToday ? "ring-2 ring-primary/20" : ""}`}>
+                    <div className="mb-2 flex items-center justify-between">
+                      <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">{dayDate.toLocaleDateString([], { weekday: "short" })}</div>
+                      <div className="text-sm font-black">{dayDate.getDate()}</div>
+                    </div>
+                    <div className="space-y-2">
+                      {dayPosts.slice(0, 4).map((post) => (
+                        <div
+                          key={post.post_id}
+                          draggable
+                          onDragStart={(e) => handleDragStart(e, post)}
+                          className={`rounded-xl px-2 py-2 text-[10px] font-semibold shadow-sm ${statusColors[post.status] || 'bg-gray-100 text-text-primary'}`}
+                          title={`${post.content} (${post.status})`}
+                        >
+                          <div className="truncate">{post.platforms[0]}</div>
+                          <div className="mt-0.5 truncate opacity-80">
+                            {new Date(post.scheduled_time || post.published_at).toLocaleTimeString([], { hour: "numeric", minute: "2-digit" })}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
         {/* Calendar Header */}
-        <div className="brutal-card p-4 mb-4">
+        <div className={`brutal-card p-4 mb-4 ${viewMode === "week" ? "hidden" : ""}`}>
           <div className="flex justify-between items-center">
             <button onClick={() => setCurrentMonth(new Date(currentMonth.getFullYear(), currentMonth.getMonth() - 1))} className="brutal-button bg-white text-text-primary text-sm px-4 py-2" data-testid="prev-month-button">
               &larr; Prev
@@ -276,7 +358,7 @@ export default function CalendarView() {
         </div>
 
         {/* Calendar Grid */}
-        <div className="brutal-card p-2 sm:p-4 overflow-x-auto" data-testid="calendar-grid">
+        <div className={`brutal-card p-2 sm:p-4 overflow-x-auto ${viewMode === "week" ? "hidden" : ""}`} data-testid="calendar-grid">
           {/* Day Headers */}
           <div className="grid grid-cols-7 gap-px mb-px min-w-[700px]">
             {['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'].map((day) => (
