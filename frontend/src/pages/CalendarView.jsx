@@ -3,7 +3,7 @@ import { useState, useEffect } from "react";
 import { useNavigate, useLocation } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
-import { Calendar as CalendarIcon, PlusCircle, GripVertical, RefreshCw, PencilLine, Trash2, X, Loader2, RotateCcw } from "lucide-react";
+import { Calendar as CalendarIcon, PlusCircle, GripVertical, RefreshCw, PencilLine, Trash2, X, Loader2, RotateCcw, BarChart3, Upload, Settings } from "lucide-react";
 
 const BACKEND_URL = "/api";
 const API = "/api";
@@ -277,7 +277,7 @@ export default function CalendarView() {
             <h1 className="text-3xl sm:text-4xl lg:text-5xl font-black font-heading tracking-tighter mb-1" data-testid="calendar-heading">
               Content Calendar
             </h1>
-            <p className="text-sm text-text-secondary">Drag posts to reschedule them</p>
+            <p className="text-sm text-text-secondary">Keep publishing, bulk uploads, analytics, and accounts in one schedule workspace.</p>
           </div>
           <div className="flex items-center gap-3">
             <div className="inline-flex rounded-full border border-border bg-white p-1 shadow-brutal">
@@ -297,6 +297,37 @@ export default function CalendarView() {
             <button onClick={() => navigate('/posts/new')} className="brutal-button bg-primary text-white flex items-center gap-2" data-testid="new-post-button">
               <PlusCircle className="w-5 h-5" /> New Post
             </button>
+          </div>
+        </div>
+
+        <div className="mb-6 rounded-2xl border border-border bg-white p-4 shadow-brutal">
+          <div className="mb-3 flex items-center justify-between gap-3">
+            <div>
+              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Schedule sidebar</div>
+              <h2 className="text-lg font-black tracking-tight">Social controls</h2>
+            </div>
+            <div className="text-xs text-text-secondary">Quick access, no clutter</div>
+          </div>
+          <div className="flex gap-3 overflow-x-auto pb-1">
+            {[
+              { label: "Bulk Upload", path: "/posts/bulk-upload", icon: Upload },
+              { label: "Analytics", path: "/analytics", icon: BarChart3 },
+              { label: "Accounts", path: "/settings/accounts", icon: Settings },
+              { label: "Calendar", path: "/posts/schedule", icon: CalendarIcon },
+            ].map((item) => {
+              const Icon = item.icon;
+              return (
+                <button
+                  key={item.label}
+                  type="button"
+                  onClick={() => navigate(item.path)}
+                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-gray-50 px-4 py-2 text-sm font-semibold text-text-primary shadow-brutal transition hover:-translate-y-0.5"
+                >
+                  <Icon className="h-4 w-4 text-primary" />
+                  {item.label}
+                </button>
+              );
+            })}
           </div>
         </div>
 
@@ -508,7 +539,7 @@ export default function CalendarView() {
                 <div>
                   <label className="block text-xs font-bold uppercase tracking-[0.2em] text-text-muted mb-2">Platforms</label>
                   <div className="flex flex-wrap gap-2">
-                    {['twitter', 'linkedin', 'instagram', 'facebook', 'youtube'].map((platform) => (
+                    {['twitter', 'linkedin'].map((platform) => (
                       <button
                         key={platform}
                         type="button"

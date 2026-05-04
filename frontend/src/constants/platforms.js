@@ -12,30 +12,6 @@ export const PLATFORMS = [
     color: 'bg-black', 
     textColor: 'text-white',
     iconText: 'X'
-  },
-  { 
-    id: 'instagram', 
-    name: 'Instagram', 
-    color: 'bg-gradient-to-br from-purple-500 to-pink-500', 
-    textColor: 'text-white', 
-    comingSoon: true,
-    iconText: 'Ig'
-  },
-  { 
-    id: 'facebook', 
-    name: 'Facebook', 
-    color: 'bg-blue-600', 
-    textColor: 'text-white', 
-    comingSoon: true,
-    iconText: 'Fb'
-  },
-  { 
-    id: 'youtube', 
-    name: 'YouTube', 
-    color: 'bg-red-600', 
-    textColor: 'text-white', 
-    comingSoon: true,
-    iconText: 'Yt'
   }
 ];
 

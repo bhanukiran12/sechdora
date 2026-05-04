@@ -15,10 +15,7 @@ const CREATOR_TYPES = [
 
 const PLATFORMS = [
   { id: "linkedin", label: "LinkedIn" },
-  { id: "twitter", label: "Twitter (X)" },
-  { id: "instagram", label: "Instagram", comingSoon: true },
-  { id: "youtube", label: "YouTube", comingSoon: true },
-  { id: "facebook", label: "Facebook", comingSoon: true }
+  { id: "twitter", label: "Twitter (X)" }
 ];
 
 export default function Onboarding() {

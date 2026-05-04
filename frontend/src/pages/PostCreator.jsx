@@ -17,10 +17,7 @@ const MAX_FILE_SIZE_MB = 10;
 
 const PLATFORMS = [
   { id: 'linkedin', name: 'LinkedIn' },
-  { id: 'twitter', name: 'Twitter (X)' },
-  { id: 'instagram', name: 'Instagram', comingSoon: true },
-  { id: 'facebook', name: 'Facebook', comingSoon: true },
-  { id: 'youtube', name: 'YouTube', comingSoon: true }
+  { id: 'twitter', name: 'Twitter (X)' }
 ];
 
 export default function PostCreator() {
@@ -261,7 +258,7 @@ export default function PostCreator() {
     setGenerating(true);
     try {
       const token = localStorage.getItem('access_token');
-      const res = await axios.post(`${API}/ai/improve-caption`, { caption: content, platform: selectedPlatforms[0] || 'instagram' }, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true });
+      const res = await axios.post(`${API}/ai/improve-caption`, { caption: content, platform: selectedPlatforms[0] || 'linkedin' }, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true });
       const improvedCaption = res.data.improved_caption || content;
       setContent(improvedCaption);
       toast.success('Caption improved!');

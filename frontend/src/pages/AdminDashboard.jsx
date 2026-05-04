@@ -13,8 +13,7 @@ import SchedoraCoin from '@/components/SchedoraCoin';
 const BACKEND_URL = "/api";
 
 const PLATFORM_ICONS = {
-  twitter: Twitter, linkedin: Linkedin, facebook: Facebook,
-  instagram: Instagram, youtube: Youtube
+  twitter: Twitter, linkedin: Linkedin
 };
 
 const USER_STATUS_STYLE = {
