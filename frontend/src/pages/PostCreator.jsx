@@ -1,4 +1,4 @@
-import { useNavigate } from "react-router-dom";
+import { useNavigate, useLocation } from "react-router-dom";
 import { useEffect, useState, useCallback } from "react";
 import axios from "axios";
 import { toast } from "sonner";
@@ -25,8 +25,10 @@ const PLATFORMS = [
 
 export default function PostCreator() {
   const navigate = useNavigate();
+  const location = useLocation();
   const { canAI, canCustomRecurrence } = usePlan();
   const [content, setContent] = useState('');
+  const [sourceTask, setSourceTask] = useState(null);
   const [selectedPlatforms, setSelectedPlatforms] = useState([]);
   const [connectedAccounts, setConnectedAccounts] = useState([]);
   const [targetAccounts, setTargetAccounts] = useState({});
@@ -60,6 +62,19 @@ export default function PostCreator() {
     setScheduledDate(formatLocalDateInput(defaultSchedule));
     setScheduledClock(defaultSchedule.toTimeString().slice(0, 5));
   }, []);
+
+  useEffect(() => {
+    const task = location.state?.task;
+    if (!task) return;
+    setSourceTask(task);
+    const prefilled = [task.title, task.description].filter(Boolean).join("\n\n");
+    if (prefilled) {
+      setContent((prev) => prev || prefilled);
+    }
+    if (task.project?.defaultPlatform && task.project.defaultPlatform !== 'all') {
+      setSelectedPlatforms((prev) => prev.length ? prev : [task.project.defaultPlatform]);
+    }
+  }, [location.state]);
 
   const timezoneName = Intl.DateTimeFormat().resolvedOptions().timeZone || "Local time";
 
@@ -288,7 +303,8 @@ export default function PostCreator() {
         content, platforms: selectedPlatforms, platform_captions: platformCaptions,
         target_accounts: targetAccounts,
         media_urls: mediaUrls, scheduled_time: scheduledTime,
-        status, recurrence: effectiveRecurrence, auto_retry: autoRetry
+        status, recurrence: effectiveRecurrence, auto_retry: autoRetry,
+        source_task_id: sourceTask?.id
       }, { headers: { Authorization: `Bearer ${token}` }, withCredentials: true });
       toast.success(status === 'scheduled' ? 'Post scheduled!' : 'Draft saved!');
       navigate('/dashboard');
@@ -364,6 +380,14 @@ export default function PostCreator() {
             <Eye className="w-5 h-5" /> {showPreview ? 'Hide Preview' : 'Show Preview'}
           </button>
         </div>
+
+        {sourceTask && (
+          <div className="brutal-card p-4 mb-6 bg-pastel-yellow/30">
+            <div className="text-[10px] uppercase tracking-[0.2em] font-black text-text-muted">Converted from task</div>
+            <div className="mt-1 font-black">{sourceTask.title}</div>
+            <p className="text-sm text-text-secondary mt-1">Publishing this post will mark the source task as done and link the post back to the task.</p>
+          </div>
+        )}
 
         <div className="grid lg:grid-cols-3 gap-8">
           {/* Main Form */}

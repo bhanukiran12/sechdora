@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins } from "lucide-react";
+import { LayoutDashboard, Calendar, BarChart3, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins, GitBranch } from "lucide-react";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
@@ -58,6 +58,10 @@ export default function Sidebar({ active }) {
     { id: 'tokens', label: 'Credits', icon: Coins, path: '/tokens' },
     { id: 'pricing', label: 'Pricing', icon: Zap, path: '/pricing' },
   ];
+
+  if (user?.role !== 'employee') {
+    menuItems.splice(1, 0, { id: 'organization', label: 'Org View', icon: GitBranch, path: '/organization' });
+  }
 
   if (user?.role === 'admin' || user?.role === 'owner') {
     menuItems.push({ id: 'admin', label: 'Admin Panel', icon: Shield, path: '/admin' });
@@ -129,8 +133,14 @@ export default function Sidebar({ active }) {
 
       <div className="mt-auto shrink-0 pt-4">
         {user && (
-          <div className="mb-3 px-4 py-2 rounded-xl bg-white border-2 border-border text-xs font-bold text-text-muted truncate">
-            {user.name || user.email}
+          <div className="mb-3 space-y-2">
+            <div className="px-4 py-2 rounded-xl bg-white border-2 border-border text-xs font-bold text-text-muted truncate">
+              {user.name || user.email}
+            </div>
+            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-black bg-pastel-yellow text-[10px] font-black uppercase tracking-widest">
+              <GitBranch className="w-3 h-3" />
+              {user.role || 'employee'} role
+            </div>
           </div>
         )}
         <button

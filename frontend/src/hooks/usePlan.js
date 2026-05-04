@@ -33,6 +33,7 @@ export default function usePlan() {
   const plan = planInfo?.plan ?? {};
   const isAdmin = planInfo?.isAdmin ?? false;
   const planType = planInfo?.planType ?? "free";
+  const role = planInfo?.role ?? "employee";
   const postsUsed = planInfo?.postsUsedThisMonth ?? 0;
   const maxPosts = plan?.maxPostsPerMonth === "unlimited" ? null : plan?.maxPostsPerMonth ?? 10;
   const connectedCount = planInfo?.connectedAccountsCount ?? 0;
@@ -45,6 +46,7 @@ export default function usePlan() {
     plan,
     planType,
     isAdmin,
+    role,
     postsUsed,
     maxPosts,
     connectedCount,
@@ -54,5 +56,7 @@ export default function usePlan() {
     canBulkUpload: isAdmin || !!plan?.bulkUpload,
     canAnalyticsDetailed: isAdmin || !!plan?.analyticsDetailed,
     canCustomRecurrence: isAdmin || !!plan?.customRecurrence,
+    canManagerRoles: isAdmin || !!plan?.managerRoleEnabled,
+    hasFullHierarchy: isAdmin || !!plan?.fullHierarchy,
   };
 }

@@ -15,6 +15,7 @@ import Dashboard from "@/pages/Dashboard";
 import PostCreator from "@/pages/PostCreator";
 import CalendarView from "@/pages/CalendarView";
 import Analytics from "@/pages/Analytics";
+import OrganizationView from "@/pages/OrganizationView";
 import ConnectedAccounts from "@/pages/ConnectedAccounts";
 import AdminDashboard from "@/pages/AdminDashboard";
 import BulkUpload from "@/pages/BulkUpload";
@@ -126,6 +127,7 @@ function AppRouter() {
       <Route path="/onboarding" element={<ProtectedRoute><Onboarding /></ProtectedRoute>} />
       <Route path="/dashboard" element={<ProtectedRoute><Dashboard /></ProtectedRoute>} />
       <Route path="/posts/new" element={<ProtectedRoute><PostCreator /></ProtectedRoute>} />
+      <Route path="/organization" element={<ProtectedRoute><OrganizationView /></ProtectedRoute>} />
       <Route path="/posts/schedule" element={<ProtectedRoute><CalendarView /></ProtectedRoute>} />
       <Route path="/posts/bulk-upload" element={<ProtectedRoute><BulkUpload /></ProtectedRoute>} />
       <Route path="/analytics" element={<ProtectedRoute><Analytics /></ProtectedRoute>} />

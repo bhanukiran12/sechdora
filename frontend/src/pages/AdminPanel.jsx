@@ -10,7 +10,7 @@ export default function AdminPanel() {
   const [teamMembers, setTeamMembers] = useState([]);
   const [pendingPosts, setPendingPosts] = useState([]);
   const [inviteEmail, setInviteEmail] = useState("");
-  const [inviteRole, setInviteRole] = useState("editor");
+  const [inviteRole, setInviteRole] = useState("employee");
   const [loading, setLoading] = useState(true);
   const [user, setUser] = useState(null);
 
@@ -136,9 +136,11 @@ export default function AdminPanel() {
                 className="brutal-input flex-1"
                 data-testid="invite-role-select"
               >
-                <option value="editor">Editor</option>
+                <option value="employee">Employee</option>
+                <option value="team_lead">Team Lead</option>
+                <option value="manager">Manager</option>
+                <option value="vp">VP</option>
                 <option value="admin">Admin</option>
-                <option value="viewer">Viewer</option>
               </select>
 
               <button
@@ -176,8 +178,10 @@ export default function AdminPanel() {
                   <div className="flex items-center gap-3">
                     <span className={`text-xs tracking-[0.2em] uppercase font-bold px-3 py-1 border border-border rounded ${
                       member.role === 'admin' ? 'bg-primary text-white' :
-                      member.role === 'editor' ? 'bg-pastel-blue' :
-                      'bg-pastel-yellow'
+                      member.role === 'vp' ? 'bg-pastel-blue' :
+                      member.role === 'manager' ? 'bg-pastel-yellow' :
+                      member.role === 'team_lead' ? 'bg-green-100' :
+                      'bg-gray-100'
                     }`}>
                       {member.role}
                     </span>

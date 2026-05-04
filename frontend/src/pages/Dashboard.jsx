@@ -123,7 +123,7 @@ function NotificationBell() {
 export default function Dashboard() {
   const navigate = useNavigate();
   const location = useLocation();
-  const { planType, isAdmin, postsUsed, maxPosts, canAI } = usePlan();
+  const { planType, isAdmin, postsUsed, maxPosts, canAI, role } = usePlan();
   const [posts, setPosts] = useState([]);
   const [accounts, setAccounts] = useState([]);
   const [analytics, setAnalytics] = useState(null);
@@ -279,6 +279,15 @@ export default function Dashboard() {
     { label: 'Connected Accounts', value: analytics?.connected_accounts || accounts.length || 0, icon: Users, color: 'bg-aiAccent', note: 'Active social logins' }
   ];
 
+  const roleCopy = {
+    admin: { label: "Admin", note: "Full control of billing, teams, and analytics.", action: "Open Org View", path: "/organization" },
+    vp: { label: "VP", note: "Strategic oversight across departments and managers.", action: "Review Hierarchy", path: "/organization" },
+    manager: { label: "Manager", note: "Own projects, assign leads, and track delivery.", action: "Open Org View", path: "/organization" },
+    team_lead: { label: "Team Lead", note: "Assign tasks and keep the team moving.", action: "Review Tasks", path: "/organization" },
+    employee: { label: "Employee", note: "Focus on execution, updates, and posting.", action: "My Tasks", path: "/posts/schedule" },
+  };
+  const activeRole = roleCopy[role || 'employee'] || roleCopy.employee;
+
   return (
     <div className="flex bg-background min-h-screen">
       <Sidebar active="dashboard" />
@@ -372,6 +381,37 @@ export default function Dashboard() {
             </div>
           </div>
         </motion.div>
+
+        <div className="grid gap-4 md:grid-cols-3 mb-12">
+          <div className="brutal-card p-5 bg-white">
+            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Current role</div>
+            <div className="text-2xl font-black font-heading">{activeRole.label}</div>
+            <p className="mt-2 text-sm text-text-secondary">{activeRole.note}</p>
+          </div>
+          <div className="brutal-card p-5 bg-white">
+            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Authority level</div>
+            <div className="text-2xl font-black font-heading">
+              {planType === 'business' || isAdmin ? 'Full hierarchy' : planType === 'pro' ? 'Project hierarchy' : 'Solo'}
+            </div>
+            <p className="mt-2 text-sm text-text-secondary">
+              {planType === 'business' || isAdmin
+                ? 'Departments, projects, leads, and employees are all available.'
+                : planType === 'pro'
+                  ? 'Managers are enabled for small teams.'
+                  : 'Hierarchy tools stay hidden on Free.'}
+            </p>
+          </div>
+          <div className="brutal-card p-5 bg-white">
+            <div className="text-[10px] tracking-[0.2em] uppercase font-black text-text-muted mb-2">Best next step</div>
+            <div className="text-2xl font-black font-heading">{activeRole.action}</div>
+            <button
+              onClick={() => navigate(planType === 'free' ? '/pricing' : activeRole.path)}
+              className="mt-4 brutal-button bg-black text-white text-[10px] px-4 py-2"
+            >
+              {planType === 'free' ? 'Upgrade' : 'Open'}
+            </button>
+          </div>
+        </div>
 
         {/* Stats Grid */}
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">

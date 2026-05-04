@@ -185,7 +185,79 @@ def calculate_token_cost(content):
         "urls": detection["urls"]
     }
 
+ROLE_ALIASES = {
+    "owner": "admin",
+    "admin": "admin",
+    "vp": "vp",
+    "manager": "manager",
+    "team_lead": "team_lead",
+    "employee": "employee",
+    # Backward compatibility with the older flat model
+    "editor": "employee",
+    "user": "employee",
+    "viewer": "employee",
+}
+
+ROLE_HIERARCHY = ["admin", "vp", "manager", "team_lead", "employee"]
 ADMIN_ROLES = {"admin", "owner"}
+
+ROLE_ACCESS = {
+    "admin": {"all": True},
+    "vp": {"departments": True, "projects": True, "manage_managers": True, "analytics": "high_level"},
+    "manager": {"projects": True, "team_leads": True, "analytics": "project"},
+    "team_lead": {"tasks": True, "review": True},
+    "employee": {"tasks": True, "execute": True},
+}
+
+PLAN_HIERARCHY = {
+    "free": {"max_team_size": 1, "manager_role": False, "full_hierarchy": False},
+    "pro": {"max_team_size": 5, "manager_role": True, "full_hierarchy": False},
+    "business": {"max_team_size": None, "manager_role": True, "full_hierarchy": True},
+}
+
+TASK_STATUS_FLOW = ["todo", "in-progress", "review", "done"]
+
+
+def normalize_role(role: Optional[str]) -> str:
+    return ROLE_ALIASES.get(str(role or "").lower(), "employee")
+
+
+def role_rank(role: Optional[str]) -> int:
+    normalized = normalize_role(role)
+    try:
+        return ROLE_HIERARCHY.index(normalized)
+    except ValueError:
+        return len(ROLE_HIERARCHY)
+
+
+def can_manage_role(actor_role: Optional[str], target_role: Optional[str]) -> bool:
+    actor = normalize_role(actor_role)
+    target = normalize_role(target_role)
+    if actor == "admin":
+        return True
+    if actor == "vp":
+        return target in {"manager", "team_lead", "employee"}
+    if actor == "manager":
+        return target in {"team_lead", "employee"}
+    if actor == "team_lead":
+        return target == "employee"
+    return False
+
+
+def can_access_hierarchy(user: dict) -> bool:
+    return normalize_role(user.get("role")) in {"admin", "vp", "manager", "team_lead"}
+
+
+def get_hierarchy_plan(user: dict) -> dict:
+    return PLAN_HIERARCHY.get(user.get("planType", "free"), PLAN_HIERARCHY["free"])
+
+
+def get_org_key(user: dict) -> str:
+    return str(user.get("team_id") or "default")
+
+
+def bson_list(items: List[dict]) -> List[dict]:
+    return [bson_safe(item) for item in items]
 
 async def deduct_tokens(user, tokens):
     """Deduct tokens from user balance. Returns (success, message).
@@ -194,7 +266,7 @@ async def deduct_tokens(user, tokens):
     if not user:
         return False, "User not found"
 
-    if user.get("role") in ADMIN_ROLES:
+    if normalize_role(user.get("role")) == "admin":
         return True, "Admin bypass — unlimited credits"
 
     current_balance = user.get("tokens", 0)
@@ -225,6 +297,7 @@ PLANS = {
         "aiEnabled": False,
         "prioritySupport": False, "bulkUpload": False,
         "analyticsDetailed": False, "customRecurrence": False,
+        "managerRoleEnabled": False, "fullHierarchy": False,
     },
     "pro": {
         "name": "Pro", "price": 999,
@@ -232,6 +305,7 @@ PLANS = {
         "aiEnabled": True,
         "prioritySupport": False, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
+        "managerRoleEnabled": True, "fullHierarchy": False,
     },
     "business": {
         "name": "Business", "price": 2999,
@@ -239,6 +313,7 @@ PLANS = {
         "aiEnabled": True,
         "prioritySupport": True, "bulkUpload": True,
         "analyticsDetailed": True, "customRecurrence": True,
+        "managerRoleEnabled": True, "fullHierarchy": True,
     },
 }
 
@@ -248,6 +323,7 @@ ADMIN_PLAN = {
     "aiEnabled": True,
     "prioritySupport": True, "bulkUpload": True,
     "analyticsDetailed": True, "customRecurrence": True,
+    "managerRoleEnabled": True, "fullHierarchy": True,
 }
 
 # SMTP Config (Netlify/GoDaddy/ForwardEmail)
@@ -371,8 +447,7 @@ async def get_current_user_from_token(token: str) -> dict:
             raise HTTPException(status_code=401, detail="User not found")
         user["_id"] = str(user["_id"])
         user.pop("password_hash", None)
-        if "role" not in user:
-            user["role"] = "user"
+        user["role"] = normalize_role(user.get("role"))
         return user
     except jwt.ExpiredSignatureError:
         raise HTTPException(status_code=401, detail="Token expired")
@@ -667,12 +742,12 @@ async def linkedin_upload_image(token: str, owner_urn: str, media_url: str) -> s
 # ─── Plan Helpers ─────────────────────────────────────────────────────────────
 
 def get_plan(user: dict) -> dict:
-    if user.get("role") in ADMIN_ROLES:
+    if normalize_role(user.get("role")) == "admin":
         return ADMIN_PLAN
     return PLANS.get(user.get("planType", "free"), PLANS["free"])
 
 async def enforce_account_limit(user: dict):
-    if user.get("role") in ADMIN_ROLES:
+    if normalize_role(user.get("role")) == "admin":
         return
     plan = get_plan(user)
     connected = await db.social_accounts.count_documents({"user_id": user["_id"], "status": "connected"})
@@ -684,7 +759,7 @@ async def enforce_account_limit(user: dict):
         })
 
 async def enforce_post_limit(user: dict):
-    if user.get("role") in ADMIN_ROLES:
+    if normalize_role(user.get("role")) == "admin":
         return
     plan = get_plan(user)
     if plan["maxPostsPerMonth"] is None:
@@ -698,7 +773,7 @@ async def enforce_post_limit(user: dict):
         })
 
 def enforce_feature(user: dict, feature: str):
-    if user.get("role") in ADMIN_ROLES:
+    if normalize_role(user.get("role")) == "admin":
         return
     plan = get_plan(user)
     if not plan.get(feature, False):
@@ -916,10 +991,41 @@ class PostCreate(BaseModel):
     recurrence: Optional[str] = None  # none, daily, weekly, monthly
     auto_retry: Optional[bool] = False
     type: Literal["text", "image", "video", "link"]
+    source_task_id: Optional[str] = None
 
 class TeamInvite(BaseModel):
     email: EmailStr
-    role: str = "editor"
+    role: str = "employee"
+
+
+class DepartmentCreate(BaseModel):
+    name: str
+    assignedVP: Optional[str] = None
+    createdBy: Optional[str] = None
+
+
+class ProjectCreate(BaseModel):
+    name: str
+    departmentId: Optional[str] = None
+    managerId: Optional[str] = None
+    teamLeadIds: List[str] = Field(default_factory=list)
+    members: List[str] = Field(default_factory=list)
+
+
+class TaskCreate(BaseModel):
+    title: str
+    description: Optional[str] = ""
+    projectId: str
+    assignedTo: Optional[str] = None
+    assignedBy: Optional[str] = None
+    status: Optional[Literal["todo", "in-progress", "review", "done"]] = "todo"
+    priority: Optional[Literal["low", "medium", "high", "urgent"]] = "medium"
+    dueDate: Optional[str] = None
+    linkedPostId: Optional[str] = None
+
+
+class TaskStatusUpdate(BaseModel):
+    status: Literal["todo", "in-progress", "review", "done"]
 
 class PostBulk(BaseModel):
     posts: List[Dict[str, Any]]
@@ -1020,7 +1126,7 @@ async def register(user_data: UserRegister):
     # Store user (or update unverified user)
     user_doc = {
         "email": email, "password_hash": hash_password(user_data.password),
-        "name": user_data.name, "role": "user", "status": "unverified",
+        "name": user_data.name, "role": "employee", "status": "unverified",
         "planType": "free", "postsUsedThisMonth": 0,
         "tokens": 10,  # Free tokens for new users
         "subscriptionStatus": "inactive", "planExpiryDate": None,
@@ -1137,6 +1243,7 @@ async def login(credentials: UserLogin, response: Response, request: Request):
 
         user["_id"] = user_id
         user.pop("password_hash", None)
+        user["role"] = normalize_role(user.get("role"))
 
         await log_event(user_id, "user_login", {"email": email})
         return SessionResponse(access_token=access_token, user=user)
@@ -1239,7 +1346,7 @@ async def google_callback(code: str = Query(None), state: str = Query(None), err
         user_id = str(existing["_id"])
     else:
         user_doc = {
-            "email": email, "name": name, "role": "user", "status": "active",
+            "email": email, "name": name, "role": "employee", "status": "active",
             "google_sub": google_sub, "avatar": picture,
             "planType": "free", "postsUsedThisMonth": 0,
             "subscriptionStatus": "inactive", "planExpiryDate": None,
@@ -1623,7 +1730,7 @@ async def create_post(post_data: PostCreate, user: dict = Depends(get_current_us
     status = post_data.status or "draft"
     if post_data.scheduled_time:
         status = "scheduled"
-    review_status = "pending" if user.get("role") == "editor" else "approved"
+    review_status = "pending" if normalize_role(user.get("role")) == "employee" else "approved"
     post_doc = {
         "post_id": post_id, "user_id": user["_id"], "content": post_data.content,
         "platforms": post_data.platforms, "platform_captions": post_data.platform_captions or {},
@@ -1633,10 +1740,17 @@ async def create_post(post_data: PostCreate, user: dict = Depends(get_current_us
         "reviewed_by": None, "recurrence": post_data.recurrence or "none",
         "auto_retry": post_data.auto_retry if post_data.auto_retry is not None else user.get("settings", {}).get("auto_retry_failed", True),
         "retry_count": 0, "created_at": datetime.now(timezone.utc).isoformat(),
-        "published_at": None, "logs": [], "error_message": None, "type": post_data.type
+        "published_at": None, "logs": [], "error_message": None, "type": post_data.type,
+        "source_task_id": post_data.source_task_id,
     }
     await db.posts.insert_one(post_doc)
     await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$inc": {"postsUsedThisMonth": 1}})
+
+    if post_data.source_task_id:
+        task_update = {"linkedPostId": post_id, "updated_at": datetime.now(timezone.utc).isoformat()}
+        if status == "scheduled":
+            task_update["status"] = "done"
+        await db.work_tasks.update_one({"id": post_data.source_task_id}, {"$set": task_update})
     
     # Token deduction for scheduled posts
     if status == "scheduled" and review_status == "approved":
@@ -1656,7 +1770,7 @@ async def create_post(post_data: PostCreate, user: dict = Depends(get_current_us
 
 @api_router.post("/posts/{post_id}/review")
 async def review_post(post_id: str, action: str, user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin", "owner"]:
+    if normalize_role(user.get("role")) != "admin":
         raise HTTPException(status_code=403, detail="Only admins can review posts")
     if action not in ["approve", "reject"]:
         raise HTTPException(status_code=400, detail="Invalid action")
@@ -1682,7 +1796,7 @@ async def retry_post(post_id: str, user: dict = Depends(get_current_user)):
 @api_router.get("/posts")
 async def get_posts(status: Optional[str] = None, review_status: Optional[str] = None, user: dict = Depends(get_current_user)):
     query = {}
-    if user.get("role") == "editor":
+    if normalize_role(user.get("role")) == "employee":
         query["user_id"] = user["_id"]
     if status:
         query["status"] = status
@@ -1711,11 +1825,18 @@ async def update_post(post_id: str, post_data: PostCreate, user: dict = Depends(
         "media_urls": normalize_media_urls(post_data.media_urls or []),
         "scheduled_time": post_data.scheduled_time,
         "recurrence": post_data.recurrence or "none",
+        "source_task_id": post_data.source_task_id,
     }
     await db.posts.update_one({"post_id": post_id}, {"$set": update_doc})
     refreshed = await db.posts.find_one({"post_id": post_id}, {"_id": 0})
     if refreshed and refreshed.get("status") == "scheduled" and refreshed.get("scheduled_time"):
         schedule_post(post_id, refreshed["scheduled_time"], refreshed.get("recurrence"))
+    source_task_id = post_data.source_task_id or existing.get("source_task_id")
+    if source_task_id and refreshed and refreshed.get("status") == "scheduled":
+        await db.work_tasks.update_one(
+            {"id": source_task_id},
+            {"$set": {"linkedPostId": post_id, "status": "done", "updated_at": datetime.now(timezone.utc).isoformat()}}
+        )
     return refreshed
 
 @api_router.delete("/posts/{post_id}")
@@ -2156,7 +2277,7 @@ async def get_unread_count(user: dict = Depends(get_current_user)):
 # ========== AUDIT LOGS ==========
 @api_router.get("/audit-logs")
 async def get_audit_logs(limit: int = 100, resource_type: Optional[str] = None, user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin", "owner"]:
+    if normalize_role(user.get("role")) != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     query = {}
     if resource_type:
@@ -2179,11 +2300,18 @@ async def get_onboarding_status(user: dict = Depends(get_current_user)):
 # ========== TEAMS ==========
 @api_router.post("/teams/invite")
 async def invite_team_member(invite: TeamInvite, user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin", "owner"]:
-        raise HTTPException(status_code=403, detail="Only admins can invite members")
+    actor_role = normalize_role(user.get("role"))
+    invite_role = normalize_role(invite.role)
+    if not can_manage_role(actor_role, invite_role):
+        raise HTTPException(status_code=403, detail="You cannot assign that role")
+    plan_caps = get_hierarchy_plan(user)
+    if invite_role in {"manager", "team_lead"} and not plan_caps.get("manager_role"):
+        raise HTTPException(status_code=403, detail="Your plan does not include manager-level roles")
+    if invite_role in {"vp", "manager", "team_lead"} and not plan_caps.get("full_hierarchy") and actor_role != "admin":
+        raise HTTPException(status_code=403, detail="Your plan does not include the full hierarchy")
     token = secrets.token_urlsafe(32)
-    await db.team_invitations.insert_one({"token": token, "email": invite.email.lower(), "role": invite.role, "team_id": user.get("team_id"), "invited_by": user["_id"], "expires_at": datetime.now(timezone.utc) + timedelta(days=7), "created_at": datetime.now(timezone.utc).isoformat()})
-    await log_audit(user["_id"], "team.invite_sent", "team_invitation", token, {"email": invite.email, "role": invite.role})
+    await db.team_invitations.insert_one({"token": token, "email": invite.email.lower(), "role": invite_role, "team_id": user.get("team_id"), "invited_by": user["_id"], "expires_at": datetime.now(timezone.utc) + timedelta(days=7), "created_at": datetime.now(timezone.utc).isoformat()})
+    await log_audit(user["_id"], "team.invite_sent", "team_invitation", token, {"email": invite.email, "role": invite_role})
     return {"message": "Invitation sent", "token": token}
 
 @api_router.post("/teams/accept-invite")
@@ -2191,7 +2319,7 @@ async def accept_invite(token: str, user: dict = Depends(get_current_user)):
     invite = await db.team_invitations.find_one({"token": token})
     if not invite:
         raise HTTPException(status_code=404, detail="Invalid invitation")
-    await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"team_id": invite["team_id"], "role": invite["role"]}})
+    await db.users.update_one({"_id": ObjectId(user["_id"])}, {"$set": {"team_id": invite["team_id"], "role": normalize_role(invite.get("role"))}})
     await db.team_invitations.delete_one({"token": token})
     return {"message": "Joined team successfully"}
 
@@ -2202,7 +2330,193 @@ async def get_team_members(user: dict = Depends(get_current_user)):
     members = await db.users.find({"team_id": user["team_id"]}, {"_id": 1, "email": 1, "name": 1, "role": 1}).to_list(100)
     for m in members:
         m["_id"] = str(m["_id"])
+        m["role"] = normalize_role(m.get("role"))
     return members
+
+
+# ========== ORG HIERARCHY ==========
+@api_router.get("/org/hierarchy")
+async def get_org_hierarchy(user: dict = Depends(get_current_user)):
+    if not can_access_hierarchy(user) and normalize_role(user.get("role")) != "admin":
+        raise HTTPException(status_code=403, detail="Hierarchy access required")
+
+    org_key = get_org_key(user)
+    scope = {} if normalize_role(user.get("role")) == "admin" else {"orgKey": org_key}
+
+    departments = await db.departments.find(scope, {"_id": 0}).sort("created_at", -1).to_list(200)
+    projects = await db.projects.find(scope, {"_id": 0}).sort("created_at", -1).to_list(500)
+    tasks = await db.work_tasks.find(scope, {"_id": 0}).sort("created_at", -1).to_list(1000)
+    members = await db.users.find(
+        {} if normalize_role(user.get("role")) == "admin" else {"team_id": user.get("team_id")},
+        {"_id": 1, "email": 1, "name": 1, "role": 1, "team_id": 1}
+    ).to_list(200)
+
+    member_directory = []
+    for member in members:
+        member["_id"] = str(member["_id"])
+        member["role"] = normalize_role(member.get("role"))
+        member_directory.append(member)
+
+    department_map = {}
+    for department in departments:
+        department_map[department["id"]] = {**department, "projects": [], "projectCount": 0, "taskCount": 0}
+
+    project_map = {}
+    for project in projects:
+        project_map[project["id"]] = {**project, "tasks": [], "taskCount": 0}
+        department_id = project.get("departmentId")
+        if department_id and department_id in department_map:
+            department_map[department_id]["projects"].append(project_map[project["id"]])
+            department_map[department_id]["projectCount"] += 1
+
+    unassigned_projects = []
+    for project in project_map.values():
+        if project.get("departmentId") not in department_map:
+            unassigned_projects.append(project)
+
+    for task in tasks:
+        project_id = task.get("projectId")
+        if project_id in project_map:
+            project_map[project_id]["tasks"].append(task)
+            project_map[project_id]["taskCount"] += 1
+            department_id = project_map[project_id].get("departmentId")
+            if department_id in department_map:
+                department_map[department_id]["taskCount"] += 1
+
+    role_summary = {role: 0 for role in ROLE_HIERARCHY}
+    for member in member_directory:
+        role_summary[member["role"]] = role_summary.get(member["role"], 0) + 1
+
+    project_status_summary = {status: 0 for status in TASK_STATUS_FLOW}
+    for task in tasks:
+        project_status_summary[task.get("status", "todo")] = project_status_summary.get(task.get("status", "todo"), 0) + 1
+
+    return {
+        "organization": {
+            "orgKey": org_key,
+            "departmentCount": len(departments),
+            "projectCount": len(projects),
+            "taskCount": len(tasks),
+        },
+        "departments": bson_list(list(department_map.values())),
+        "unassignedProjects": bson_list(unassigned_projects),
+        "tasks": bson_list(tasks),
+        "members": member_directory,
+        "roleSummary": role_summary,
+        "taskStatusSummary": project_status_summary,
+    }
+
+
+@api_router.post("/departments")
+async def create_department(data: DepartmentCreate, user: dict = Depends(get_current_user)):
+    role = normalize_role(user.get("role"))
+    plan_caps = get_hierarchy_plan(user)
+    if role == "vp" and not plan_caps.get("full_hierarchy"):
+        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+    if role not in {"admin", "vp"}:
+        raise HTTPException(status_code=403, detail="Only Admin and VP can create departments")
+    department_id = f"dept_{uuid.uuid4().hex[:10]}"
+    department = {
+        "id": department_id,
+        "name": data.name.strip(),
+        "createdBy": data.createdBy or user["_id"],
+        "assignedVP": data.assignedVP or (user["_id"] if role == "vp" else None),
+        "team_id": user.get("team_id"),
+        "orgKey": get_org_key(user),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.departments.insert_one(department)
+    await log_audit(user["_id"], "org.department_created", "department", department_id, {"name": data.name})
+    department.pop("_id", None)
+    return department
+
+
+@api_router.post("/projects")
+async def create_project(data: ProjectCreate, user: dict = Depends(get_current_user)):
+    role = normalize_role(user.get("role"))
+    plan_caps = get_hierarchy_plan(user)
+    if role == "manager" and not plan_caps.get("manager_role"):
+        raise HTTPException(status_code=403, detail="Manager role is not available on your plan")
+    if role == "vp" and not plan_caps.get("full_hierarchy"):
+        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+    if role not in {"admin", "vp", "manager"}:
+        raise HTTPException(status_code=403, detail="Only Admin, VP, or Manager can create projects")
+    project_id = f"proj_{uuid.uuid4().hex[:10]}"
+    project = {
+        "id": project_id,
+        "name": data.name.strip(),
+        "departmentId": data.departmentId,
+        "managerId": data.managerId or (user["_id"] if role == "manager" else None),
+        "teamLeadIds": list(dict.fromkeys([str(item) for item in data.teamLeadIds])),
+        "members": list(dict.fromkeys([str(item) for item in data.members])),
+        "team_id": user.get("team_id"),
+        "orgKey": get_org_key(user),
+        "createdBy": user["_id"],
+        "created_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.projects.insert_one(project)
+    await log_audit(user["_id"], "org.project_created", "project", project_id, {"name": data.name, "departmentId": data.departmentId})
+    project.pop("_id", None)
+    return project
+
+
+@api_router.post("/tasks")
+async def create_task(data: TaskCreate, user: dict = Depends(get_current_user)):
+    role = normalize_role(user.get("role"))
+    plan_caps = get_hierarchy_plan(user)
+    if role == "vp" and not plan_caps.get("full_hierarchy"):
+        raise HTTPException(status_code=403, detail="VP access is only available on the Business plan")
+    if role == "team_lead" and not plan_caps.get("full_hierarchy"):
+        raise HTTPException(status_code=403, detail="Team Lead access is only available on the Business plan")
+    if role == "manager" and not plan_caps.get("manager_role"):
+        raise HTTPException(status_code=403, detail="Manager role is not available on your plan")
+    if role not in {"admin", "vp", "manager", "team_lead"}:
+        raise HTTPException(status_code=403, detail="Only leaders can create tasks")
+    task_id = f"task_{uuid.uuid4().hex[:10]}"
+    task = {
+        "id": task_id,
+        "title": data.title.strip(),
+        "description": data.description or "",
+        "projectId": data.projectId,
+        "assignedTo": data.assignedTo,
+        "assignedBy": data.assignedBy or user["_id"],
+        "status": data.status or "todo",
+        "priority": data.priority or "medium",
+        "dueDate": data.dueDate,
+        "linkedPostId": data.linkedPostId,
+        "team_id": user.get("team_id"),
+        "orgKey": get_org_key(user),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.work_tasks.insert_one(task)
+    if task.get("assignedTo"):
+        await create_notification(task["assignedTo"], "info", "Task Assigned", f"{task['title']} was assigned to you.", None)
+    await log_audit(user["_id"], "org.task_created", "task", task_id, {"projectId": data.projectId, "assignedTo": data.assignedTo})
+    task.pop("_id", None)
+    return task
+
+
+@api_router.put("/tasks/{task_id}/status")
+async def update_task_status(task_id: str, data: TaskStatusUpdate, user: dict = Depends(get_current_user)):
+    task = await db.work_tasks.find_one({"id": task_id})
+    if not task:
+        raise HTTPException(status_code=404, detail="Task not found")
+
+    role = normalize_role(user.get("role"))
+    if role == "employee" and data.status == "done":
+        raise HTTPException(status_code=403, detail="Employees cannot mark tasks as done")
+    if role not in {"admin", "vp", "manager", "team_lead", "employee"}:
+        raise HTTPException(status_code=403, detail="Not allowed to update tasks")
+
+    await db.work_tasks.update_one(
+        {"id": task_id},
+        {"$set": {"status": data.status, "updated_at": datetime.now(timezone.utc).isoformat()}}
+    )
+    await log_audit(user["_id"], "org.task_status_updated", "task", task_id, {"status": data.status})
+    if task.get("assignedTo"):
+        await create_notification(task["assignedTo"], "info", "Task Updated", f"{task['title']} moved to {data.status}.", None)
+    return {"message": "Task updated", "status": data.status}
 
 
 # ========== PUBLISHING + AUTO-RETRY + RECURRING ==========
@@ -2762,7 +3076,7 @@ async def delete_own_account(user: dict = Depends(get_current_user)):
 # ========== ADMIN DASHBOARD ==========
 @api_router.get("/admin/stats")
 async def get_admin_stats(user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin", "owner"]:
+    if normalize_role(user.get("role")) != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
     total_users = await db.users.count_documents({})
@@ -2828,14 +3142,14 @@ async def get_admin_stats(user: dict = Depends(get_current_user)):
 
 @api_router.get("/admin/feedback")
 async def get_admin_feedback(user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin", "owner"]:
+    if normalize_role(user.get("role")) != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
     return await db.feedback.find({}, {"_id": 0}).sort("created_at", -1).limit(100).to_list(100)
 
 
 @api_router.get("/admin/users")
 async def get_admin_users(user: dict = Depends(get_current_user)):
-    if user["role"] not in ["admin", "owner"]:
+    if normalize_role(user.get("role")) != "admin":
         raise HTTPException(status_code=403, detail="Admin access required")
 
     all_users = await db.users.find(
@@ -3069,7 +3383,7 @@ async def get_pricing_plans():
 @api_router.get("/user/plan")
 async def get_user_plan(user: dict = Depends(get_current_user)):
     plan = get_plan(user)
-    is_admin = user.get("role") in ADMIN_ROLES
+    is_admin = normalize_role(user.get("role")) == "admin"
     connected = await db.social_accounts.count_documents({"user_id": user["_id"], "status": "connected"})
     plan_type = "admin" if is_admin else user.get("planType", "free")
     return {
