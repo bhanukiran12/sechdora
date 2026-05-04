@@ -1,5 +1,5 @@
 import { useNavigate } from "react-router-dom";
-import { LayoutDashboard, Calendar, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins, GitBranch, NotebookPen, ListTodo } from "lucide-react";
+import { LayoutDashboard, Calendar, Settings, LogOut, Shield, Upload, Menu, X, Briefcase, Zap, Coins, GitBranch, NotebookPen, ListTodo, BarChart3 } from "lucicon-react";
 import axios from "axios";
 import { useState, useEffect } from "react";
 import { motion, AnimatePresence } from "framer-motion";
