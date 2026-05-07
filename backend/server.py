@@ -1218,6 +1218,18 @@ class TaskUpdate(BaseModel):
 class TaskStatusUpdate(BaseModel):
     status: Literal["todo", "in-progress", "review", "done"]
 
+class DocCreate(BaseModel):
+    title: str
+    content: str
+    tags: Optional[List[str]] = Field(default_factory=list)
+    description: Optional[str] = ""
+
+class DocUpdate(BaseModel):
+    title: Optional[str] = None
+    content: Optional[str] = None
+    tags: Optional[List[str]] = None
+    description: Optional[str] = None
+
 class PostBulk(BaseModel):
     posts: List[Dict[str, Any]]
 
@@ -2876,6 +2888,116 @@ async def update_task_status(task_id: str, data: TaskStatusUpdate, user: dict = 
     if task.get("assignedTo"):
         await create_notification(task["assignedTo"], "info", "Task Updated", f"{task['title']} moved to {data.status}.", None)
     return {"message": "Task updated", "status": data.status}
+
+
+# ========== DOCS (SAVED DOCUMENTS) CRUD ==========
+@api_router.post("/docs")
+async def create_doc(data: DocCreate, user: dict = Depends(get_current_user)):
+    plan_caps = get_plan(user)
+    if not plan_caps.get("docs"):
+        raise HTTPException(status_code=403, detail="Docs feature is not available on your plan")
+    
+    doc_id = f"doc_{uuid.uuid4().hex[:10]}"
+    doc = {
+        "id": doc_id,
+        "user_id": str(user["_id"]),
+        "title": data.title.strip(),
+        "content": data.content,
+        "description": data.description or "",
+        "tags": data.tags or [],
+        "team_id": user.get("team_id"),
+        "orgKey": get_org_key(user),
+        "created_at": datetime.now(timezone.utc).isoformat(),
+        "updated_at": datetime.now(timezone.utc).isoformat(),
+    }
+    await db.saved_docs.insert_one(doc)
+    await log_audit(user["_id"], "productivity.doc_created", "doc", doc_id, {"title": data.title})
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.get("/docs")
+async def get_docs(user: dict = Depends(get_current_user)):
+    plan_caps = get_plan(user)
+    if not plan_caps.get("docs"):
+        raise HTTPException(status_code=403, detail="Docs feature is not available on your plan")
+    
+    org_key = get_org_key(user)
+    docs = await db.saved_docs.find(
+        {"orgKey": org_key}
+    ).sort("created_at", -1).to_list(None)
+    
+    for doc in docs:
+        doc.pop("_id", None)
+    
+    return {"docs": docs, "count": len(docs)}
+
+
+@api_router.get("/docs/{doc_id}")
+async def get_doc(doc_id: str, user: dict = Depends(get_current_user)):
+    plan_caps = get_plan(user)
+    if not plan_caps.get("docs"):
+        raise HTTPException(status_code=403, detail="Docs feature is not available on your plan")
+    
+    doc = await db.saved_docs.find_one({"id": doc_id})
+    if not doc:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    org_key = get_org_key(user)
+    if doc.get("orgKey") != org_key:
+        raise HTTPException(status_code=403, detail="Access denied to this document")
+    
+    doc.pop("_id", None)
+    return doc
+
+
+@api_router.put("/docs/{doc_id}")
+async def update_doc(doc_id: str, data: DocUpdate, user: dict = Depends(get_current_user)):
+    plan_caps = get_plan(user)
+    if not plan_caps.get("docs"):
+        raise HTTPException(status_code=403, detail="Docs feature is not available on your plan")
+    
+    existing = await db.saved_docs.find_one({"id": doc_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    org_key = get_org_key(user)
+    if existing.get("orgKey") != org_key:
+        raise HTTPException(status_code=403, detail="Access denied to update this document")
+    
+    update_doc = {}
+    for key in ["title", "content", "tags", "description"]:
+        value = getattr(data, key)
+        if value is not None:
+            update_doc[key] = value.strip() if isinstance(value, str) else value
+    
+    if update_doc:
+        update_doc["updated_at"] = datetime.now(timezone.utc).isoformat()
+        await db.saved_docs.update_one({"id": doc_id}, {"$set": update_doc})
+        await log_audit(user["_id"], "productivity.doc_updated", "doc", doc_id, {})
+    
+    refreshed = await db.saved_docs.find_one({"id": doc_id}, {"_id": 0})
+    return refreshed
+
+
+@api_router.delete("/docs/{doc_id}")
+async def delete_doc(doc_id: str, user: dict = Depends(get_current_user)):
+    plan_caps = get_plan(user)
+    if not plan_caps.get("docs"):
+        raise HTTPException(status_code=403, detail="Docs feature is not available on your plan")
+    
+    existing = await db.saved_docs.find_one({"id": doc_id})
+    if not existing:
+        raise HTTPException(status_code=404, detail="Document not found")
+    
+    org_key = get_org_key(user)
+    if existing.get("orgKey") != org_key:
+        raise HTTPException(status_code=403, detail="Access denied to delete this document")
+    
+    await db.saved_docs.delete_one({"id": doc_id})
+    await log_audit(user["_id"], "productivity.doc_deleted", "doc", doc_id, {"title": existing.get("title")})
+    trash_id = await stash_org_trash("doc", {"doc": bson_safe(existing)})
+    return {"message": "Document deleted", "trash_id": trash_id}
 
 
 # ========== PUBLISHING + AUTO-RETRY + RECURRING ==========

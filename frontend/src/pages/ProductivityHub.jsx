@@ -3,7 +3,8 @@ import { useNavigate } from "react-router-dom";
 import { toast } from "sonner";
 import Sidebar from "@/components/Sidebar";
 import usePlan from "@/hooks/usePlan";
-import { NotebookPen, StickyNote, Plus, CalendarDays, CheckCircle2, FileText, ArrowRight, Shield, ListTodo } from "lucide-react";
+import { NotebookPen, StickyNote, Plus, CalendarDays, CheckCircle2, FileText, ArrowRight, Shield, ListTodo, Trash2, Edit2, X } from "lucide-react";
+import { getDocs, createDoc, updateDoc, deleteDoc } from "@/utils/docs";
 
 const STORAGE_KEY = "schedora_productivity_hub";
 
@@ -13,9 +14,6 @@ const emptyState = {
   ],
   todos: [
     { id: "todo-1", title: "Plan next task batch", status: "todo", dueDate: "" },
-  ],
-  docs: [
-    { id: "doc-1", title: "Weekly delivery note", body: "Summary, blockers, next steps." },
   ],
 };
 
@@ -28,7 +26,14 @@ export default function ProductivityHub() {
   const [draftTodo, setDraftTodo] = useState("");
   const [draftDueDate, setDraftDueDate] = useState("");
   const [draftDoc, setDraftDoc] = useState("");
+  const [draftDocTitle, setDraftDocTitle] = useState("");
   const [workspace, setWorkspace] = useState(emptyState);
+  const [docs, setDocs] = useState([]);
+  const [docsLoading, setDocsLoading] = useState(false);
+  const [selectedDoc, setSelectedDoc] = useState(null);
+  const [editingDocId, setEditingDocId] = useState(null);
+  const [editingDocTitle, setEditingDocTitle] = useState("");
+  const [editingDocContent, setEditingDocContent] = useState("");
 
   useEffect(() => {
     try {
@@ -48,8 +53,107 @@ export default function ProductivityHub() {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(workspace));
   }, [hydrated, workspace]);
 
+  // Load docs from backend when canDocs becomes true
+  useEffect(() => {
+    if (!canDocs) return;
+    loadDocs();
+  }, [canDocs]);
+
+  const loadDocs = async () => {
+    try {
+      setDocsLoading(true);
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        toast.error("Please log in to manage docs");
+        return;
+      }
+      const fetchedDocs = await getDocs(token);
+      setDocs(fetchedDocs);
+    } catch (error) {
+      console.error("Error loading docs:", error);
+      toast.error("Failed to load docs");
+    } finally {
+      setDocsLoading(false);
+    }
+  };
+
   const todoLimit = planType === "free" ? 10 : planType === "pro" ? 50 : null;
   const remainingTodos = todoLimit === null ? null : Math.max(0, todoLimit - workspace.todos.length);
+
+  const addDoc = async () => {
+    if (!draftDocTitle.trim() || !draftDoc.trim()) {
+      toast.error("Please provide both title and content");
+      return;
+    }
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        toast.error("Please log in to save docs");
+        return;
+      }
+      await createDoc({
+        title: draftDocTitle.trim(),
+        content: draftDoc.trim(),
+        description: "",
+        tags: []
+      }, token);
+      setDraftDoc("");
+      setDraftDocTitle("");
+      toast.success("Doc saved");
+      loadDocs();
+    } catch (error) {
+      console.error("Error saving doc:", error);
+      toast.error(error.response?.data?.detail || "Failed to save doc");
+    }
+  };
+
+  const handleEditDoc = (doc) => {
+    setEditingDocId(doc.id);
+    setEditingDocTitle(doc.title);
+    setEditingDocContent(doc.content);
+  };
+
+  const saveEditedDoc = async () => {
+    if (!editingDocTitle.trim() || !editingDocContent.trim()) {
+      toast.error("Please provide both title and content");
+      return;
+    }
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        toast.error("Please log in");
+        return;
+      }
+      await updateDoc(editingDocId, {
+        title: editingDocTitle.trim(),
+        content: editingDocContent.trim()
+      }, token);
+      setEditingDocId(null);
+      toast.success("Doc updated");
+      loadDocs();
+    } catch (error) {
+      console.error("Error updating doc:", error);
+      toast.error(error.response?.data?.detail || "Failed to update doc");
+    }
+  };
+
+  const handleDeleteDoc = async (docId) => {
+    if (!window.confirm("Are you sure you want to delete this doc?")) return;
+    try {
+      const token = localStorage.getItem("access_token");
+      if (!token) {
+        toast.error("Please log in");
+        return;
+      }
+      await deleteDoc(docId, token);
+      toast.success("Doc deleted");
+      loadDocs();
+      setSelectedDoc(null);
+    } catch (error) {
+      console.error("Error deleting doc:", error);
+      toast.error(error.response?.data?.detail || "Failed to delete doc");
+    }
+  };
 
   const addNote = () => {
     if (!draftNote.trim()) return;
@@ -71,16 +175,6 @@ export default function ProductivityHub() {
     setDraftTodo("");
     setDraftDueDate("");
     toast.success("Todo added");
-  };
-
-  const addDoc = () => {
-    if (!draftDoc.trim()) return;
-    setWorkspace((prev) => ({
-      ...prev,
-      docs: [{ id: crypto.randomUUID(), title: "Working doc", body: draftDoc.trim() }, ...prev.docs],
-    }));
-    setDraftDoc("");
-    toast.success("Doc saved");
   };
 
   const nextStatus = (status) => {
@@ -252,16 +346,55 @@ export default function ProductivityHub() {
                   </div>
                   <FileText className="h-5 w-5 text-primary" />
                 </div>
-                <textarea
-                  value={draftDoc}
-                  onChange={(e) => setDraftDoc(e.target.value)}
-                  className="brutal-input mt-4 w-full min-h-36 resize-none"
-                  placeholder="Write a working doc, brief, or outcome summary..."
-                />
-                <button onClick={addDoc} className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5">
-                  <Plus className="h-4 w-4" />
-                  Save doc
-                </button>
+                {editingDocId ? (
+                  <div className="mt-4 space-y-3">
+                    <input
+                      type="text"
+                      value={editingDocTitle}
+                      onChange={(e) => setEditingDocTitle(e.target.value)}
+                      className="brutal-input w-full py-3"
+                      placeholder="Document title..."
+                    />
+                    <textarea
+                      value={editingDocContent}
+                      onChange={(e) => setEditingDocContent(e.target.value)}
+                      className="brutal-input w-full min-h-36 resize-none"
+                      placeholder="Write a working doc, brief, or outcome summary..."
+                    />
+                    <div className="flex gap-3">
+                      <button onClick={saveEditedDoc} className="inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5">
+                        <Plus className="h-4 w-4" />
+                        Update doc
+                      </button>
+                      <button onClick={() => setEditingDocId(null)} className="inline-flex items-center gap-2 rounded-2xl border border-border bg-white px-4 py-3 text-sm font-semibold text-black shadow-brutal transition hover:-translate-y-0.5">
+                        <X className="h-4 w-4" />
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <>
+                    <div className="mt-4 space-y-3">
+                      <input
+                        type="text"
+                        value={draftDocTitle}
+                        onChange={(e) => setDraftDocTitle(e.target.value)}
+                        className="brutal-input w-full py-3"
+                        placeholder="Document title..."
+                      />
+                      <textarea
+                        value={draftDoc}
+                        onChange={(e) => setDraftDoc(e.target.value)}
+                        className="brutal-input w-full min-h-36 resize-none"
+                        placeholder="Write a working doc, brief, or outcome summary..."
+                      />
+                    </div>
+                    <button onClick={addDoc} className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5">
+                      <Plus className="h-4 w-4" />
+                      Save doc
+                    </button>
+                  </>
+                )}
               </div>
             )}
           </section>
@@ -306,23 +439,49 @@ export default function ProductivityHub() {
                 </div>
               </div>
             )}
-            {activeSection === "docs" && (
+            {canDocs && activeSection === "docs" && (
               <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
                 <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Docs board</div>
-                <div className="mt-4 space-y-3">
-                  {workspace.docs.length > 0 ? (
-                    workspace.docs.map((doc) => (
+                {docsLoading ? (
+                  <div className="mt-4 text-sm text-text-secondary">Loading docs...</div>
+                ) : docs.length > 0 ? (
+                  <div className="mt-4 space-y-3">
+                    {docs.map((doc) => (
                       <div key={doc.id} className="rounded-2xl border border-border bg-gray-50 p-4">
-                        <div className="font-semibold text-text-primary">{doc.title}</div>
-                        <p className="mt-2 text-sm text-text-secondary">{doc.body}</p>
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="flex-1">
+                            <div className="font-semibold text-text-primary">{doc.title}</div>
+                            <p className="mt-2 text-sm text-text-secondary line-clamp-2">{doc.content}</p>
+                            <div className="mt-2 text-xs text-text-muted line-clamp-1">{new Date(doc.updated_at).toLocaleDateString()}</div>
+                          </div>
+                        </div>
+                        <div className="mt-3 flex gap-2">
+                          <button
+                            onClick={() => {
+                              setSelectedDoc(doc);
+                              handleEditDoc(doc);
+                            }}
+                            className="inline-flex items-center gap-1 rounded-lg border border-border bg-white px-2 py-1 text-xs font-semibold shadow-brutal transition hover:-translate-y-0.5"
+                          >
+                            <Edit2 className="h-3 w-3" />
+                            Edit
+                          </button>
+                          <button
+                            onClick={() => handleDeleteDoc(doc.id)}
+                            className="inline-flex items-center gap-1 rounded-lg border border-red-300 bg-red-50 px-2 py-1 text-xs font-semibold text-red-700 shadow-brutal transition hover:-translate-y-0.5"
+                          >
+                            <Trash2 className="h-3 w-3" />
+                            Delete
+                          </button>
+                        </div>
                       </div>
-                    ))
-                  ) : (
-                    <div className="rounded-2xl border border-border bg-gray-50 p-4 text-sm text-text-secondary">
-                      No saved docs yet. Use the Docs section to add a new one.
-                    </div>
-                  )}
-                </div>
+                    ))}
+                  </div>
+                ) : (
+                  <div className="mt-4 rounded-2xl border border-border bg-gray-50 p-4 text-sm text-text-secondary">
+                    No saved docs yet. Use the Docs section to add a new one.
+                  </div>
+                )}
               </div>
             )}
           </aside>
