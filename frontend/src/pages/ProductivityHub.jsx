@@ -23,6 +23,7 @@ export default function ProductivityHub() {
   const navigate = useNavigate();
   const { planType, canTodoScheduling, canDocs, hasOrgTools } = usePlan();
   const [hydrated, setHydrated] = useState(false);
+  const [activeSection, setActiveSection] = useState("notes");
   const [draftNote, setDraftNote] = useState("");
   const [draftTodo, setDraftTodo] = useState("");
   const [draftDueDate, setDraftDueDate] = useState("");
@@ -118,87 +119,131 @@ export default function ProductivityHub() {
           </div>
         </div>
 
+        {/* Section Navigation */}
+        <div className="mb-8 rounded-2xl border border-border bg-white p-4 shadow-brutal flex gap-3 flex-wrap">
+          <button
+            onClick={() => setActiveSection("notes")}
+            className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all border-2 ${
+              activeSection === "notes"
+                ? "bg-primary text-white border-black shadow-brutal"
+                : "border-transparent text-text-secondary hover:border-black hover:bg-gray-50"
+            }`}
+          >
+            <StickyNote className="h-4 w-4" />
+            Notes
+          </button>
+          <button
+            onClick={() => setActiveSection("todos")}
+            className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all border-2 ${
+              activeSection === "todos"
+                ? "bg-primary text-white border-black shadow-brutal"
+                : "border-transparent text-text-secondary hover:border-black hover:bg-gray-50"
+            }`}
+          >
+            <ListTodo className="h-4 w-4" />
+            Todos
+          </button>
+          {canDocs && (
+            <button
+              onClick={() => setActiveSection("docs")}
+              className={`inline-flex items-center gap-2 px-4 py-3 rounded-xl font-semibold transition-all border-2 ${
+                activeSection === "docs"
+                  ? "bg-primary text-white border-black shadow-brutal"
+                  : "border-transparent text-text-secondary hover:border-black hover:bg-gray-50"
+              }`}
+            >
+              <FileText className="h-4 w-4" />
+              Docs
+            </button>
+          )}
+        </div>
+
+        {/* Content Sections */}
         <div className="grid gap-6 lg:grid-cols-[1.15fr_0.85fr]">
           <section className="space-y-6">
-            <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Notes</div>
-                  <h2 className="text-2xl font-black">Simple notes</h2>
-                </div>
-                <StickyNote className="h-5 w-5 text-primary" />
-              </div>
-              <textarea
-                value={draftNote}
-                onChange={(e) => setDraftNote(e.target.value)}
-                className="brutal-input mt-4 w-full min-h-28 resize-none"
-                placeholder="Write a quick note, meeting takeaway, or checklist..."
-              />
-              <button onClick={addNote} className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5">
-                <Plus className="h-4 w-4" />
-                Add note
-              </button>
-            </div>
-
-            <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
-              <div className="flex items-center justify-between gap-3">
-                <div>
-                  <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Todos</div>
-                  <h2 className="text-2xl font-black">Task list</h2>
-                </div>
-                <ListTodo className="h-5 w-5 text-primary" />
-              </div>
-              <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
-                <input
-                  value={draftTodo}
-                  onChange={(e) => setDraftTodo(e.target.value)}
-                  className="brutal-input w-full py-3"
-                  placeholder="Add a task"
-                />
-                <input
-                  type="datetime-local"
-                  value={draftDueDate}
-                  onChange={(e) => setDraftDueDate(e.target.value)}
-                  className={`brutal-input w-full py-3 ${canTodoScheduling ? "" : "opacity-70"}`}
-                  disabled={!canTodoScheduling}
-                  title={canTodoScheduling ? "Set a due date" : "Todo scheduling unlocks on Pro"}
-                />
-              </div>
-              <button onClick={addTodo} className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-black px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5">
-                <Plus className="h-4 w-4" />
-                Add todo
-              </button>
-              {todoLimit !== null && (
-                <p className="mt-2 text-xs text-text-muted">
-                  {remainingTodos} todos left on this plan
-                </p>
-              )}
-              <div className="mt-4 space-y-3">
-                {workspace.todos.map((todo) => (
-                  <div key={todo.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-gray-50 px-4 py-3">
-                    <div>
-                      <div className="font-semibold text-text-primary">{todo.title}</div>
-                      <div className="text-xs text-text-muted">
-                        {todo.dueDate ? `Due ${new Date(todo.dueDate).toLocaleString()}` : "No due date"}
-                      </div>
-                    </div>
-                    <button
-                      type="button"
-                      onClick={() => setWorkspace((prev) => ({
-                        ...prev,
-                        todos: prev.todos.map((item) => item.id === todo.id ? { ...item, status: nextStatus(item.status) } : item),
-                      }))}
-                      className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-xs font-semibold shadow-brutal"
-                    >
-                      <CheckCircle2 className="h-4 w-4 text-primary" />
-                      {todo.status}
-                    </button>
+            {activeSection === "notes" && (
+              <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Notes</div>
+                    <h2 className="text-2xl font-black">Simple notes</h2>
                   </div>
-                ))}
+                  <StickyNote className="h-5 w-5 text-primary" />
+                </div>
+                <textarea
+                  value={draftNote}
+                  onChange={(e) => setDraftNote(e.target.value)}
+                  className="brutal-input mt-4 w-full min-h-28 resize-none"
+                  placeholder="Write a quick note, meeting takeaway, or checklist..."
+                />
+                <button onClick={addNote} className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-primary px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5">
+                  <Plus className="h-4 w-4" />
+                  Add note
+                </button>
               </div>
-            </div>
+            )}
 
-            {canDocs && (
+            {activeSection === "todos" && (
+              <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
+                <div className="flex items-center justify-between gap-3">
+                  <div>
+                    <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Todos</div>
+                    <h2 className="text-2xl font-black">Task list</h2>
+                  </div>
+                  <ListTodo className="h-5 w-5 text-primary" />
+                </div>
+                <div className="mt-4 grid gap-3 md:grid-cols-[1fr_auto]">
+                  <input
+                    value={draftTodo}
+                    onChange={(e) => setDraftTodo(e.target.value)}
+                    className="brutal-input w-full py-3"
+                    placeholder="Add a task"
+                  />
+                  <input
+                    type="datetime-local"
+                    value={draftDueDate}
+                    onChange={(e) => setDraftDueDate(e.target.value)}
+                    className={`brutal-input w-full py-3 ${canTodoScheduling ? "" : "opacity-70"}`}
+                    disabled={!canTodoScheduling}
+                    title={canTodoScheduling ? "Set a due date" : "Todo scheduling unlocks on Pro"}
+                  />
+                </div>
+                <button onClick={addTodo} className="mt-3 inline-flex items-center gap-2 rounded-2xl bg-black px-4 py-3 text-sm font-semibold text-white shadow-brutal transition hover:-translate-y-0.5">
+                  <Plus className="h-4 w-4" />
+                  Add todo
+                </button>
+                {todoLimit !== null && (
+                  <p className="mt-2 text-xs text-text-muted">
+                    {remainingTodos} todos left on this plan
+                  </p>
+                )}
+                <div className="mt-4 space-y-3">
+                  {workspace.todos.map((todo) => (
+                    <div key={todo.id} className="flex items-center justify-between gap-3 rounded-2xl border border-border bg-gray-50 px-4 py-3">
+                      <div>
+                        <div className="font-semibold text-text-primary">{todo.title}</div>
+                        <div className="text-xs text-text-muted">
+                          {todo.dueDate ? `Due ${new Date(todo.dueDate).toLocaleString()}` : "No due date"}
+                        </div>
+                      </div>
+                      <button
+                        type="button"
+                        onClick={() => setWorkspace((prev) => ({
+                          ...prev,
+                          todos: prev.todos.map((item) => item.id === todo.id ? { ...item, status: nextStatus(item.status) } : item),
+                        }))}
+                        className="inline-flex items-center gap-2 rounded-full border border-border bg-white px-3 py-2 text-xs font-semibold shadow-brutal"
+                      >
+                        <CheckCircle2 className="h-4 w-4 text-primary" />
+                        {todo.status}
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              </div>
+            )}
+
+            {canDocs && activeSection === "docs" && (
               <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
                 <div className="flex items-center justify-between gap-3">
                   <div>
@@ -248,17 +293,19 @@ export default function ProductivityHub() {
               )}
             </div>
 
-            <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
-              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Notes board</div>
-              <div className="mt-4 space-y-3">
-                {workspace.notes.map((note) => (
-                  <div key={note.id} className="rounded-2xl border border-border bg-gray-50 p-4">
-                    <div className="font-semibold text-text-primary">{note.title}</div>
-                    <p className="mt-2 text-sm text-text-secondary">{note.body}</p>
-                  </div>
-                ))}
+            {activeSection === "notes" && (
+              <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
+                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Notes board</div>
+                <div className="mt-4 space-y-3">
+                  {workspace.notes.map((note) => (
+                    <div key={note.id} className="rounded-2xl border border-border bg-gray-50 p-4">
+                      <div className="font-semibold text-text-primary">{note.title}</div>
+                      <p className="mt-2 text-sm text-text-secondary">{note.body}</p>
+                    </div>
+                  ))}
+                </div>
               </div>
-            </div>
+            )}
           </aside>
         </div>
       </main>
