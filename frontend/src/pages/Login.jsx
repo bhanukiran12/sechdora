@@ -1,4 +1,5 @@
 import { useState } from "react";
+import { Eye, EyeOff } from "lucide-react";
 import { useNavigate } from "react-router-dom";
 import axios from "axios";
 import { toast } from "sonner";
@@ -27,6 +28,7 @@ export default function Login() {
   const [name, setName] = useState("");
   const [loading, setLoading] = useState(false);
   const [showOtp, setShowOtp] = useState(false);
+  const [showPassword, setShowPassword] = useState(false);
   const [otpEmail, setOtpEmail] = useState("");
   const [resending, setResending] = useState(false);
 
@@ -252,16 +254,26 @@ export default function Login() {
                       <label className="mb-2 block text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">
                         Password
                       </label>
-                      <input
-                        type="password"
-                        value={password}
-                        onChange={(e) => setPassword(e.target.value)}
-                        className="brutal-input w-full py-3 text-sm"
-                        placeholder="••••••••"
-                        required
-                        minLength={6}
-                        data-testid="password-input"
-                      />
+                      <div className="relative">
+                        <input
+                          type={showPassword ? "text" : "password"}
+                          value={password}
+                          onChange={(e) => setPassword(e.target.value)}
+                          className="brutal-input w-full py-3 pr-11 text-sm"
+                          placeholder="••••••••"
+                          required
+                          minLength={6}
+                          data-testid="password-input"
+                        />
+                        <button
+                          type="button"
+                          onClick={() => setShowPassword((prev) => !prev)}
+                          className="absolute inset-y-0 right-3 flex items-center justify-center text-text-muted transition hover:text-text-primary"
+                          aria-label={showPassword ? "Hide password" : "Show password"}
+                        >
+                          {showPassword ? <EyeOff className="w-5 h-5" /> : <Eye className="w-5 h-5" />}
+                        </button>
+                      </div>
                     </div>
 
                     <button
