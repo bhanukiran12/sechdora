@@ -306,6 +306,25 @@ export default function ProductivityHub() {
                 </div>
               </div>
             )}
+            {activeSection === "docs" && (
+              <div className="rounded-2xl border border-border bg-white p-5 shadow-brutal">
+                <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Docs board</div>
+                <div className="mt-4 space-y-3">
+                  {workspace.docs.length > 0 ? (
+                    workspace.docs.map((doc) => (
+                      <div key={doc.id} className="rounded-2xl border border-border bg-gray-50 p-4">
+                        <div className="font-semibold text-text-primary">{doc.title}</div>
+                        <p className="mt-2 text-sm text-text-secondary">{doc.body}</p>
+                      </div>
+                    ))
+                  ) : (
+                    <div className="rounded-2xl border border-border bg-gray-50 p-4 text-sm text-text-secondary">
+                      No saved docs yet. Use the Docs section to add a new one.
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
           </aside>
         </div>
       </main>
