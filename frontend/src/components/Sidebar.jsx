@@ -108,7 +108,8 @@ export default function Sidebar({ active }) {
 
   const sidebarContent = (
     <div className="flex h-full flex-col overflow-hidden">
-      <div className="mb-6 flex items-center justify-between">
+      {/* Fixed Logo Section */}
+      <div className="mb-6 flex items-center justify-between flex-shrink-0">
         <motion.div
           initial={{ rotate: -4, y: -4, scale: 0.96 }}
           animate={{ rotate: 0, y: 0, scale: 1 }}
@@ -123,109 +124,112 @@ export default function Sidebar({ active }) {
         </button>
       </div>
 
-      {user && (
-        <div className="mb-4">
-          <TokenBadge tokens={user.tokens} isAdmin={user?.role === 'admin' || user?.role === 'owner'} />
-        </div>
-      )}
-
-      {orgSummary && (
-        <div className="mb-4 rounded-xl border-2 border-black bg-pastel-blue/15 p-4 shadow-brutalSoft">
-          <div className="flex items-center justify-between gap-2">
-            <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Org Snapshot</div>
-            <GitBranch className="h-4 w-4" />
-          </div>
-          <div className="mt-3 grid grid-cols-3 gap-2">
-            <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
-              <div className="text-lg font-black">{orgSummary.organization?.departmentCount || 0}</div>
-              <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Depts</div>
-            </div>
-            <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
-              <div className="text-lg font-black">{orgSummary.organization?.projectCount || 0}</div>
-              <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Projects</div>
-            </div>
-            <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
-              <div className="text-lg font-black">{orgSummary.organization?.taskCount || 0}</div>
-              <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Tasks</div>
-            </div>
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2">
-            <span className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Flow</span>
-            <span className="text-[10px] font-black uppercase tracking-[0.18em] text-text-primary">
-              {user?.role || 'employee'} → work
-            </span>
-          </div>
-        </div>
-      )}
-
-      {active === 'schedule' && (
-        <div className="mb-4 rounded-xl border border-border bg-white p-3 shadow-brutal">
-          <div className="mb-2 text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Schedule tools</div>
-          <div className="flex gap-2 overflow-x-auto pb-1">
-            {scheduleRailItems.map((item) => {
-              const Icon = item.icon;
-              return (
-                <button
-                  key={item.id}
-                  type="button"
-                  onClick={() => handleNav(item.path)}
-                  className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-gray-50 px-3 py-2 text-[11px] font-semibold text-text-primary shadow-brutal transition hover:-translate-y-0.5"
-                >
-                  <Icon className="h-3.5 w-3.5 text-primary" />
-                  {item.label}
-                </button>
-              );
-            })}
-          </div>
-        </div>
-      )}
-
-      <nav className="flex-1 space-y-3 overflow-y-auto pr-1 pb-4">
-        {menuItems.map((item, idx) => {
-          const Icon = item.icon;
-          const isActive = active === item.id;
-          return (
-            <motion.button
-              key={item.id}
-              initial={{ x: -20, opacity: 0 }}
-              animate={{ x: 0, opacity: 1 }}
-              transition={{ delay: idx * 0.03 }}
-              whileHover={{ x: 2 }}
-              onClick={() => handleNav(item.path)}
-              className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border-2 ${
-                isActive
-                  ? 'bg-primary text-white border-black shadow-brutal translate-x-1'
-                  : 'text-text-secondary border-transparent hover:border-black hover:bg-white hover:shadow-brutal-hover'
-              }`}
-              data-testid={`sidebar-${item.id}`}
-            >
-              <Icon className="w-5 h-5" strokeWidth={3} />
-              {item.label}
-            </motion.button>
-          );
-        })}
-      </nav>
-
-      <div className="mt-auto shrink-0 pt-4">
+      {/* Scrollable Content Section */}
+      <div className="flex-1 overflow-y-auto pr-1 space-y-4">
         {user && (
-          <div className="mb-3 space-y-2">
-            <div className="px-4 py-2 rounded-xl bg-white border-2 border-border text-xs font-bold text-text-muted truncate">
-              {user.name || user.email}
+          <div>
+            <TokenBadge tokens={user.tokens} isAdmin={user?.role === 'admin' || user?.role === 'owner'} />
+          </div>
+        )}
+
+        {orgSummary && (
+          <div className="rounded-xl border-2 border-black bg-pastel-blue/15 p-4 shadow-brutalSoft">
+            <div className="flex items-center justify-between gap-2">
+              <div className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Org Snapshot</div>
+              <GitBranch className="h-4 w-4" />
             </div>
-            <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-black bg-pastel-yellow text-[10px] font-black uppercase tracking-widest">
-              <GitBranch className="w-3 h-3" />
-              {user.role || 'employee'} role
+            <div className="mt-3 grid grid-cols-3 gap-2">
+              <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
+                <div className="text-lg font-black">{orgSummary.organization?.departmentCount || 0}</div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Depts</div>
+              </div>
+              <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
+                <div className="text-lg font-black">{orgSummary.organization?.projectCount || 0}</div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Projects</div>
+              </div>
+              <div className="rounded-xl border-2 border-black bg-white p-2 text-center">
+                <div className="text-lg font-black">{orgSummary.organization?.taskCount || 0}</div>
+                <div className="text-[9px] font-black uppercase tracking-widest text-text-muted">Tasks</div>
+              </div>
+            </div>
+            <div className="mt-3 flex items-center justify-between gap-2 rounded-xl border-2 border-black bg-white px-3 py-2">
+              <span className="text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Flow</span>
+              <span className="text-[10px] font-black uppercase tracking-[0.18em] text-text-primary">
+                {user?.role || 'employee'} → work
+              </span>
             </div>
           </div>
         )}
-        <button
-          onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-text-muted hover:bg-red-50 hover:text-red-600 hover:border-red-600 border-2 border-transparent transition-all"
-          data-testid="logout-button"
-        >
-          <LogOut className="w-5 h-5" strokeWidth={3} />
-          Logout
-        </button>
+
+        {active === 'schedule' && (
+          <div className="rounded-xl border border-border bg-white p-3 shadow-brutal">
+            <div className="mb-2 text-[10px] font-black uppercase tracking-[0.24em] text-text-muted">Schedule tools</div>
+            <div className="flex gap-2 overflow-x-auto pb-1">
+              {scheduleRailItems.map((item) => {
+                const Icon = item.icon;
+                return (
+                  <button
+                    key={item.id}
+                    type="button"
+                    onClick={() => handleNav(item.path)}
+                    className="inline-flex items-center gap-2 whitespace-nowrap rounded-full border border-border bg-gray-50 px-3 py-2 text-[11px] font-semibold text-text-primary shadow-brutal transition hover:-translate-y-0.5"
+                  >
+                    <Icon className="h-3.5 w-3.5 text-primary" />
+                    {item.label}
+                  </button>
+                );
+              })}
+            </div>
+          </div>
+        )}
+
+        <nav className="space-y-3 pb-4">
+          {menuItems.map((item, idx) => {
+            const Icon = item.icon;
+            const isActive = active === item.id;
+            return (
+              <motion.button
+                key={item.id}
+                initial={{ x: -20, opacity: 0 }}
+                animate={{ x: 0, opacity: 1 }}
+                transition={{ delay: idx * 0.03 }}
+                whileHover={{ x: 2 }}
+                onClick={() => handleNav(item.path)}
+                className={`w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold transition-all border-2 ${
+                  isActive
+                    ? 'bg-primary text-white border-black shadow-brutal translate-x-1'
+                    : 'text-text-secondary border-transparent hover:border-black hover:bg-white hover:shadow-brutal-hover'
+                }`}
+                data-testid={`sidebar-${item.id}`}
+              >
+                <Icon className="w-5 h-5" strokeWidth={3} />
+                {item.label}
+              </motion.button>
+            );
+          })}
+        </nav>
+
+        <div className="pt-4">
+          {user && (
+            <div className="mb-3 space-y-2">
+              <div className="px-4 py-2 rounded-xl bg-white border-2 border-border text-xs font-bold text-text-muted truncate">
+                {user.name || user.email}
+              </div>
+              <div className="inline-flex items-center gap-2 px-3 py-2 rounded-xl border-2 border-black bg-pastel-yellow text-[10px] font-black uppercase tracking-widest">
+                <GitBranch className="w-3 h-3" />
+                {user.role || 'employee'} role
+              </div>
+            </div>
+          )}
+          <button
+            onClick={handleLogout}
+            className="w-full flex items-center gap-3 px-4 py-3 rounded-xl font-bold text-text-muted hover:bg-red-50 hover:text-red-600 hover:border-red-600 border-2 border-transparent transition-all"
+            data-testid="logout-button"
+          >
+            <LogOut className="w-5 h-5" strokeWidth={3} />
+            Logout
+          </button>
+        </div>
       </div>
     </div>
   );
